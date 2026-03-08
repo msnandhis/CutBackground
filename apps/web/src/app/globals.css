@@ -1,0 +1,35 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-magenta: #ff0076;
+  --brand-dark: #12131a;
+  --brand-light: #f0faff;
+  --brand-success: #10b981;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  color: #333333;
+  background-color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Quicksand", sans-serif;
+}
+
+/* Smooth focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--brand-magenta);
+  outline-offset: 2px;
+}
