@@ -1,15 +1,18 @@
-import { createClient as supabaseCreateClient } from "@supabase/supabase-js";
-import type { Database } from "./types";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 export function createClient() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const databaseUrl = process.env.DATABASE_URL;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!databaseUrl) {
         throw new Error(
-            "Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set."
+            "Missing DATABASE_URL environment variable."
         );
     }
 
-    return supabaseCreateClient<Database>(supabaseUrl, supabaseAnonKey);
+    const pool = new Pool({
+        connectionString: databaseUrl,
+    });
+
+    return drizzle(pool);
 }
