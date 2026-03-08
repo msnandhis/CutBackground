@@ -4,7 +4,7 @@
 
 ### Free AI-Powered Background Remover | Remove Image Backgrounds in Seconds
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwindcss)](https://tailwindcss.com)
@@ -20,7 +20,7 @@
 
 **CutBackground** is a production-ready, SEO-optimized web application for removing image backgrounds instantly using AI. Upload any image (product photo, headshot, or graphic) and get a clean transparent PNG in seconds. No signup, no watermark, no limits on quality.
 
-Built as a **scalable monorepo boilerplate**, the architecture is designed to launch multiple AI tool websites quickly (e.g., video watermark remover, face generator, subtitle extractor) by swapping only the processing logic and page content.
+Built as a **scalable monorepo boilerplate**, the architecture is designed to launch multiple AI tool websites quickly by swapping only the processing logic and page content.
 
 ---
 
@@ -33,12 +33,51 @@ Built as a **scalable monorepo boilerplate**, the architecture is designed to la
 | **Styling** | Tailwind CSS 3.4 | Fast UI development, consistent design system |
 | **State** | React Query (TanStack) | Client-side cache, polling, optimistic updates |
 | **Validation** | Zod | Runtime validation for forms, API payloads, env vars |
-| **Database** | Supabase | PostgreSQL, Auth, Row Level Security |
-| **Auth** | Supabase Auth (SSR) | Signup, login, OAuth, session lifecycle |
+| **Database** | PostgreSQL (self-hosted) | Relational data store |
+| **ORM** | Drizzle ORM | Type-safe SQL-like ORM with migrations |
+| **Auth** | BetterAuth | Self-hosted auth, server-side sessions, CSRF |
 | **Storage** | Cloudflare R2 | S3-compatible object storage for uploads/outputs |
 | **Queue** | BullMQ + Redis | Background jobs, rate limiting, log batching |
+| **AI** | Replicate (primary) | AI model inference with fallback support |
 | **Logging** | Pino | Structured JSON logging with request context |
 | **Monorepo** | Turborepo + pnpm | Shared packages, parallel builds, caching |
+
+---
+
+## 🔐 Authentication
+
+Powered by **BetterAuth** with full security:
+
+| Feature | Details |
+|---|---|
+| Email + Password | Signup, login, Argon2 hashing |
+| Magic Link | Passwordless login via email |
+| Forgot Password | Secure reset via time-limited email link |
+| Reset Password | Set new password, revokes all sessions |
+| Email Verification | Required before account activation |
+| Session Management | Server-side sessions with httpOnly cookies |
+| CSRF Protection | Built-in on all auth endpoints |
+| Brute Force | Account lockout after failed attempts |
+| Rate Limiting | Redis-based, per-endpoint limits |
+
+---
+
+## 🤖 AI Provider Architecture
+
+Pluggable AI provider system with automatic fallback:
+
+| Provider | Model | Status |
+|---|---|---|
+| **Replicate (primary)** | `851-labs/background-remover` | Active |
+| **Replicate (fallback)** | `lucataco/remove-bg` | Active |
+| **fal.ai** | TBD | Planned |
+| **Gemini** | TBD | Planned |
+| **OpenRouter** | TBD | Planned |
+
+- Automatic fallback when primary model fails
+- Webhook support for async processing
+- Idempotency keys prevent duplicate requests
+- Supports both image and video background removal
 
 ---
 
@@ -49,35 +88,39 @@ CutBackground/
 ├── apps/
 │   ├── web/                         # Next.js web application
 │   │   ├── config/                  # Site & tool configuration
-│   │   │   ├── site.ts              # Site identity, SEO, analytics
-│   │   │   └── tool.ts              # Tool settings, file limits, rate limits
 │   │   └── src/
-│   │       ├── app/                 # Next.js App Router pages
-│   │       └── features/            # Feature-based architecture
-│   │           ├── tool/            # Core tool processing UI & API
-│   │           ├── marketing/       # Landing page sections & SEO pages
-│   │           ├── auth/            # Authentication flows
-│   │           ├── billing/         # Subscription & payment logic
-│   │           └── admin/           # Admin dashboards
-│   └── mobile/                      # Future React Native / Expo app
+│   │       ├── app/
+│   │       │   ├── api/auth/        # BetterAuth handler
+│   │       │   ├── api/jobs/        # Job processing APIs
+│   │       │   ├── api/webhooks/    # Replicate webhooks
+│   │       │   ├── (auth)/          # Login, signup, forgot/reset password pages
+│   │       │   └── dashboard/       # User dashboard
+│   │       ├── features/
+│   │       │   ├── tool/            # Upload, processing, result UI
+│   │       │   ├── auth/            # Auth forms and hooks
+│   │       │   ├── marketing/       # Landing page sections
+│   │       │   ├── billing/         # Subscription logic
+│   │       │   └── admin/           # Admin dashboards
+│   │       └── middleware.ts        # Auth + rate limiting
+│   └── mobile/                      # Future React Native app
 ├── packages/
 │   ├── core/                        # Shared business logic
-│   │   ├── src/logger/              # Pino structured logger
-│   │   ├── src/redis/               # Redis client + rate limiter
+│   │   ├── src/auth/                # BetterAuth server + client
+│   │   ├── src/ai-provider/         # Replicate, fal.ai, etc.
+│   │   ├── src/addons/              # Upscale, bg-color, crop, shadow
 │   │   ├── src/jobs/                # BullMQ queues & workers
+│   │   ├── src/logger/              # Pino structured logging
+│   │   ├── src/redis/               # Redis client + rate limiter
 │   │   ├── src/r2/                  # Cloudflare R2 presigned URLs
-│   │   └── src/billing/             # Abstract payment provider interface
-│   ├── database/                    # Supabase client & typed schema
+│   │   └── src/billing/             # Abstract payment interface
+│   ├── database/                    # Drizzle ORM schema + migrations
 │   ├── ui/                          # Shared React + Tailwind components
-│   ├── tsconfig/                    # Shared TypeScript configurations
+│   ├── tsconfig/                    # Shared TypeScript configs
 │   └── eslint-config/               # Shared ESLint rules
-├── docs/
-│   ├── plan.md                      # Full architecture plan
-│   └── implementation.md            # Step-by-step implementation phases
-├── Dockerfile                       # Multi-stage production build
-├── .env.example                     # Environment variable template
-├── turbo.json                       # Turborepo pipeline config
-└── pnpm-workspace.yaml              # Workspace definitions
+├── Dockerfile
+├── .env.example
+├── turbo.json
+└── pnpm-workspace.yaml
 ```
 
 ---
@@ -88,7 +131,8 @@ CutBackground/
 
 - **Node.js** >= 18
 - **pnpm** >= 9 (`npm install -g pnpm`)
-- **Redis** (for BullMQ & rate limiting, self-hosted or cloud)
+- **PostgreSQL** (self-hosted, e.g., Docker or local install)
+- **Redis** (for BullMQ & rate limiting)
 
 ### Installation
 
@@ -97,7 +141,7 @@ CutBackground/
 git clone https://github.com/msnandhis/CutBackground.git
 cd CutBackground
 
-# Install all dependencies (root + all workspaces)
+# Install all dependencies
 pnpm install
 
 # Copy environment variables
@@ -106,31 +150,47 @@ cp .env.example .env.local
 
 ### Configure Environment
 
-Edit `.env.local` with your service credentials:
+Edit `.env.local` with your credentials:
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# BetterAuth
+BETTER_AUTH_SECRET=your-secret-min-32-chars  # openssl rand -base64 32
+BETTER_AUTH_URL=http://localhost:3000
+
+# PostgreSQL
+DATABASE_URL=postgresql://user:password@localhost:5432/cutbackground
+
+# Replicate
+REPLICATE_API_TOKEN=r8_your_token
 
 # Cloudflare R2
-R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
-R2_ACCESS_KEY_ID=your-r2-access-key
-R2_SECRET_ACCESS_KEY=your-r2-secret-key
+R2_ENDPOINT=https://your-account.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=your-key
+R2_SECRET_ACCESS_KEY=your-secret
 R2_BUCKET_NAME=tool-uploads
 
 # Redis
 REDIS_URL=redis://localhost:6379
 
-# Site Identity
-NEXT_PUBLIC_SITE_DOMAIN=cutbackground.com
-NEXT_PUBLIC_TOOL_NAME=background-remover
+# Email (Resend)
+RESEND_API_KEY=re_your_key
+EMAIL_FROM=noreply@cutbackground.com
+```
+
+### Database Setup
+
+```bash
+# Run Drizzle migrations
+pnpm --filter=@repo/database db:migrate
+
+# Generate BetterAuth tables
+npx @better-auth/cli migrate
 ```
 
 ### Run Development Server
 
 ```bash
-# Start the web app with Turbopack
+# Start with Turbopack
 pnpm dev --filter=@repo/web
 
 # Or run all apps
@@ -139,23 +199,10 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Build for Production
-
-```bash
-# Build all packages and apps
-pnpm build
-
-# Build web app only
-pnpm build --filter=@repo/web
-```
-
 ### Docker Deployment
 
 ```bash
-# Build the Docker image
 docker build -t cutbackground .
-
-# Run the container
 docker run -p 3000:3000 --env-file .env.local cutbackground
 ```
 
@@ -167,79 +214,70 @@ Works with **Coolify**, **Railway**, or any Docker-compatible platform.
 
 ### ✅ Phase 1: Monorepo Foundation (Complete)
 - Turborepo + pnpm workspace scaffolding
-- Shared TypeScript configurations (`base`, `nextjs`, `library`)
-- Shared ESLint config (flat config with Prettier)
-- `@repo/ui`: Shared component library (Button component)
-- `@repo/database`: Supabase typed client and schema definitions
-- `@repo/core`: Logger (Pino), Redis rate limiter, BullMQ job queues, Cloudflare R2 presigned URLs, billing abstraction
+- Shared TypeScript, ESLint, and Prettier configs
+- Core packages: logger, Redis, BullMQ, R2, billing abstraction
 
 ### ✅ Phase 2: Homepage & Marketing (Complete)
-- Responsive landing page with 8 sections:
-  - Sticky navbar with glass-blur effect
-  - Hero section with before/after visual
-  - Scrolling logo cloud (Trusted By)
-  - Interactive tabbed Use Cases section
-  - How it works (3-step flow)
-  - Vibrant testimonial cards (amber, sky, magenta)
-  - CTA section with dual buttons
-  - Multi-column footer with social links
-- SEO metadata via `generateMetadata` API
-- OpenGraph and Twitter card meta tags
-- Google Fonts (Inter + Quicksand)
+- Responsive landing page with 8 sections
+- Interactive tabbed Use Cases, vibrant testimonial cards
+- SEO metadata, OpenGraph, Google Fonts
 
 ### ✅ Deployment Ready
 - Multi-stage Dockerfile (standalone Next.js output)
-- `.dockerignore` for minimal build context
-- `.env.example` with all required variables documented
+- `.env.example` with all required variables
 
 ---
 
 ## 🗺️ Roadmap
 
-### Phase 3: Core Tool Interface
-- [ ] Drag-and-drop file upload component with progress indicator
-- [ ] Direct client-to-R2 uploads via presigned URLs
-- [ ] BullMQ worker for background processing
-- [ ] SSE / polling for real-time job status updates
-- [ ] Result preview and download interface
+### Phase 3: Database Layer (Drizzle ORM + PostgreSQL)
+- [ ] Drizzle schema definitions for all tables
+- [ ] Database migrations
 
-### Phase 4: Authentication & User Dashboard
-- [ ] Supabase Auth integration (email, Google OAuth)
-- [ ] User profile and usage history
-- [ ] Credits system with free tier
+### Phase 4: Authentication (BetterAuth)
+- [ ] Email/password signup and login
+- [ ] Magic link passwordless login
+- [ ] Forgot password and reset password flows
+- [ ] Email verification
+- [ ] Auth middleware for route protection
+- [ ] Auth pages (login, signup, forgot, reset, verify)
 
-### Phase 5: SEO Automation
-- [ ] Dynamic `sitemap.xml` generation
-- [ ] Auto-generated `robots.txt`
-- [ ] `llms.txt` for AI crawler guidance
-- [ ] JSON-LD structured data (FAQ schema, HowTo schema)
-- [ ] Blog system with `next-mdx-remote`
-- [ ] i18n with `next-intl`
+### Phase 5: AI Provider System
+- [ ] Pluggable AI provider interface
+- [ ] Replicate implementation with webhook support
+- [ ] Primary + fallback model chain
 
-### Phase 6: Billing & Monetization
-- [ ] Stripe integration via abstract payment provider
-- [ ] Subscription plans and checkout flows
-- [ ] Ad placement slots (AdSense, Carbon Ads)
+### Phase 6: Core Tool Interface
+- [ ] Drag-and-drop file upload to R2
+- [ ] BullMQ background processing
+- [ ] Result preview with before/after slider
 
-### Phase 7: Deployment & DevOps
-- [ ] `netlify.toml` configuration
-- [ ] Vercel deployment config
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Health checks and monitoring
+### Phase 7: Add-On Features
+- [ ] Upscale (AI-based 2x/4x)
+- [ ] Background color/image replacement
+- [ ] Auto-crop and shadow
+
+### Phase 8: SEO Automation
+- [ ] Sitemap, robots.txt, JSON-LD schemas
+- [ ] Blog system, i18n
+
+### Phase 9: Billing
+- [ ] Abstract payment provider (Stripe first)
+- [ ] Subscription plans and checkout
 
 ---
 
 ## 🧩 Reusing for Other Tools
 
-This boilerplate is designed to launch multiple tool websites. To create a new tool:
+This boilerplate launches multiple tool websites. To create a new tool:
 
 1. **Fork or clone** this repository
 2. **Update `config/site.ts`**: change name, domain, SEO keywords
-3. **Update `config/tool.ts`**: set accepted file types, rate limits, processing config
-4. **Update page content**: modify the marketing components in `src/features/marketing/`
-5. **Add processing logic**: implement your tool's AI processing in `src/features/tool/`
+3. **Update `config/tool.ts`**: set file types, rate limits, processing config
+4. **Update page content**: modify marketing components
+5. **Add processing logic**: implement AI processing in `features/tool/`
 
-Example tools you can build:
+Example tools:
 - `VideoWatermarks.com`: Video watermark remover
 - `GenerateFace.com`: AI face generator
 - `SubtitlesVideo.com`: Video subtitle extractor
@@ -249,7 +287,7 @@ Example tools you can build:
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See the [LICENSE](LICENSE) file for details.
 
 ---
 

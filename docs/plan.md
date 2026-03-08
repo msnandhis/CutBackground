@@ -13,25 +13,215 @@ Create a production-ready web application for AI-powered background removal from
 | **Styling** | Tailwind CSS 3.4 | Fast UI development, consistent design system |
 | **State** | React Query (TanStack) | Client-side cache, polling, optimistic updates |
 | **Validation** | Zod | Runtime validation for forms, API payloads, env vars |
-| **Database** | Supabase | PostgreSQL, Auth, Row Level Security |
-| **Auth** | Supabase Auth (SSR) | Session handling, user identity, OAuth |
+| **Database** | PostgreSQL (self-hosted) | Relational data store |
+| **ORM** | Drizzle ORM | Type-safe, SQL-like ORM with migrations |
+| **Auth** | BetterAuth | Self-hosted auth with server-side sessions |
 | **Storage** | Cloudflare R2 | S3-compatible object storage for uploads/outputs |
 | **Queue** | BullMQ + Redis | Background job processing, rate limiting, log batching |
 | **Logging** | Pino | Fast, structured JSON logging with request context |
 | **AI Provider** | Replicate (primary), fal.ai, Gemini, OpenRouter (future) | AI model inference via pluggable provider system |
 | **Monorepo** | Turborepo + pnpm | Shared packages, parallel builds, caching |
 
+---
+
+## Authentication: BetterAuth + Drizzle
+
+### Why BetterAuth
+
+- **Self-hosted**: Full ownership of user data and auth logic
+- **Server-side sessions**: Secure httpOnly cookies, not localStorage JWTs
+- **CSRF protection**: Built-in on all auth endpoints
+- **Session rotation**: Automatic on privilege changes (password change, role update)
+- **Brute force protection**: Account lockout after repeated failed attempts
+- **TypeScript-first**: Full type safety with the Drizzle adapter
+- **Plugin system**: Extensible with magic-link, email-verification, forgot-password plugins
+
+### Auth Flows
+
+| Flow | Description | Security |
+|---|---|---|
+| **Email + Password Signup** | User registers with email/password. Email verification sent. | Argon2 hashing, email verification required |
+| **Email + Password Login** | User logs in with verified credentials. Session created. | CSRF token, httpOnly cookie, brute force lockout |
+| **Magic Link Login** | User enters email, receives one-time login link | Time-limited token (15 min), single-use, httpOnly session |
+| **Forgot Password** | User requests reset email with secure token | Time-limited token (1 hour), single-use |
+| **Reset Password** | User clicks reset link, sets new password | Invalidates all existing sessions on password change |
+| **Logout** | Destroys server-side session, clears cookie | Session revoked from DB |
+
+### Session Management
+
+- Sessions stored in PostgreSQL via Drizzle (server-side, not JWT)
+- Session token set as httpOnly, Secure, SameSite=Lax cookie
+- Default expiration: 7 days, auto-refresh on activity
+- On password change: all other sessions are revoked
+- Rate limiting applied to all auth endpoints via Redis
+
+### BetterAuth Configuration
+
+```typescript
+// packages/core/src/auth/auth.ts
+import { betterAuth } from "better-auth"
+import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { magicLink } from "better-auth/plugins"
+import { db } from "@repo/database"
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, { provider: "pg" }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    sendResetPassword: async ({ user, url }) => {
+      // Send via email service (Resend/Nodemailer)
+    },
+  },
+  plugins: [
+    magicLink({
+      sendMagicLink: async ({ email, url }) => {
+        // Send via email service
+      },
+    }),
+  ],
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24, // refresh daily
+  },
+  rateLimit: {
+    window: 60,  // 1 minute window
+    max: 10,     // max 10 requests per window
+  },
+})
+```
+
+### Next.js Integration
+
+```typescript
+// apps/web/src/app/api/auth/[...all]/route.ts
+import { auth } from "@repo/core/auth"
+import { toNextJsHandler } from "better-auth/next-js"
+
+export const { POST, GET } = toNextJsHandler(auth)
+```
+
+### Client-Side Auth
+
+```typescript
+// packages/core/src/auth/auth-client.ts
+import { createAuthClient } from "better-auth/react"
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+})
+
+// Available hooks:
+// authClient.useSession()
+// authClient.signIn.email()
+// authClient.signUp.email()
+// authClient.signIn.magicLink()
+// authClient.forgetPassword()
+// authClient.resetPassword()
+// authClient.signOut()
+```
+
+### Auth Middleware (Route Protection)
+
+```typescript
+// apps/web/middleware.ts
+import { auth } from "@repo/core/auth"
+import { NextRequest, NextResponse } from "next/server"
+
+const protectedPaths = ["/dashboard", "/settings", "/api/jobs"]
+
+export async function middleware(request: NextRequest) {
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  })
+
+  if (protectedPaths.some(p => request.nextUrl.pathname.startsWith(p))) {
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url))
+    }
+  }
+
+  return NextResponse.next()
+}
+```
+
+---
+
+## Database: Drizzle ORM + Self-Hosted PostgreSQL
+
+### Schema Overview
+
+BetterAuth auto-manages its own tables (`user`, `session`, `verification`, `account`). Application tables are defined alongside:
+
+```typescript
+// packages/database/src/schema/index.ts
+
+// BetterAuth tables (auto-managed)
+// - user
+// - session
+// - verification
+// - account
+
+// Application tables
+export { jobs } from "./jobs"
+export { addonJobs } from "./addon-jobs"
+export { usageLogs } from "./usage-logs"
+```
+
+### `jobs` Table
+
+| Column | Type | Description |
+|---|---|---|
+| id | uuid | Primary key |
+| userId | text (nullable) | FK to user.id (null for anonymous) |
+| idempotencyKey | text | Unique key to prevent duplicate requests |
+| inputType | text | "image" or "video" |
+| inputUrl | text | R2 URL of uploaded file |
+| outputUrl | text | R2 URL of processed result |
+| status | text | "pending", "processing", "succeeded", "failed", "canceled" |
+| provider | text | "replicate", "fal", etc. |
+| providerPredictionId | text | External prediction ID |
+| modelUsed | text | Model identifier used |
+| errorMessage | text | Error details if failed |
+| metadata | jsonb | Additional data (file size, processing time, etc.) |
+| ipAddress | text | Requester IP |
+| fingerprint | text | Device fingerprint |
+| createdAt | timestamptz | Job creation time |
+| completedAt | timestamptz | Job completion time |
+
+### `addon_jobs` Table
+
+| Column | Type | Description |
+|---|---|---|
+| id | uuid | Primary key |
+| parentJobId | uuid | FK to jobs.id |
+| addonType | text | "upscale", "bg-color", etc. |
+| inputUrl | text | Source image URL |
+| outputUrl | text | Processed result URL |
+| status | text | "pending", "processing", "succeeded", "failed" |
+| params | jsonb | Add-on specific parameters |
+| createdAt | timestamptz | Creation time |
+
+### `usage_logs` Table
+
+| Column | Type | Description |
+|---|---|---|
+| id | uuid | Primary key |
+| userId | text (nullable) | FK to user.id |
+| ipAddress | text | Requester IP |
+| fingerprint | text | Device fingerprint |
+| toolName | text | e.g., "background-remover" |
+| action | text | "upload", "process", "addon", "download" |
+| metadata | jsonb | Additional context |
+| createdAt | timestamptz | Log time |
+
+---
+
 ## AI Provider Architecture
 
 ### Design Principle: Pluggable Provider System
 
-All AI model calls go through an abstract `AIProvider` interface. This ensures:
-- Easy switching between providers (Replicate, fal.ai, Gemini, OpenRouter)
-- Fallback chains when a primary provider fails
-- Per-operation cost tracking
-- Webhook support for async predictions
-
-### Provider Interface
+All AI model calls go through an abstract `AIProvider` interface:
 
 ```typescript
 // packages/core/src/ai-provider/types.ts
@@ -42,22 +232,6 @@ interface AIProvider {
   getPredictionStatus(id: string): Promise<PredictionStatus>
   cancelPrediction(id: string): Promise<void>
   supportsWebhook: boolean
-}
-
-interface PredictionInput {
-  model: string                    // e.g., "851-labs/background-remover"
-  version?: string                 // specific version hash
-  input: Record<string, unknown>   // model-specific input
-  webhookUrl?: string              // callback URL for async results
-  webhookEvents?: string[]         // ["start", "completed"]
-}
-
-interface PredictionResult {
-  id: string
-  status: "starting" | "processing" | "succeeded" | "failed" | "canceled"
-  output?: unknown
-  error?: string
-  provider: string
 }
 ```
 
@@ -70,265 +244,145 @@ interface PredictionResult {
 **Fallback Model (images):**
 - `lucataco/remove-bg:95fcc2a26d3899cd6c2691c900465aaeff466285a65c14638cc5f36f34befaf1`
 
-**Video Models (future):**
-- Video background removal models will be added as they become available on Replicate
-
 ### Fallback Strategy
 
 ```
-Request arrives
-  -> Try Primary Model (851-labs/background-remover)
-  -> If fails/timeout after 30s -> Try Fallback (lucataco/remove-bg)
-  -> If both fail -> Return error with retry option
+Request -> Try Primary (851-labs) -> If fails/timeout 30s -> Try Fallback (lucataco) -> If both fail -> Error + retry
 ```
-
-Deduplication: Each job gets a unique `idempotencyKey` (hash of file URL + user fingerprint + timestamp). Before creating a prediction, the system checks if one already exists in the `jobs` table with the same key.
 
 ### Webhook Flow
 
 ```
-1. User uploads image to R2 -> gets presigned URL
-2. API creates BullMQ job with file reference
-3. BullMQ worker calls Replicate API with webhook URL
-4. Replicate sends POST to /api/webhooks/replicate when done
-5. Webhook handler updates job status in Supabase
-6. Client polls /api/jobs/status/[id] or receives SSE update
+1. User uploads image to R2
+2. API creates BullMQ job
+3. Worker calls Replicate with webhook URL
+4. Replicate POSTs to /api/webhooks/replicate on completion
+5. Webhook handler updates job in PostgreSQL
+6. Client polls /api/jobs/status/[id]
 ```
 
-Webhook URL format: `https://{domain}/api/webhooks/replicate?jobId={id}&secret={hmac}`
+---
 
-## Tool Processing: Images & Videos
+## Add-On Features
 
-### Input Types
+After background removal, users can apply add-ons to the result:
 
-| Type | Formats | Max Size | Processing |
+| Add-On | Type | AI Required | Description |
 |---|---|---|---|
-| **Image** | PNG, JPG, JPEG, WebP | 10MB | Background removal, transparent PNG output |
-| **Video** | MP4, WebM, MOV | 50MB | Frame-by-frame or model-based bg removal |
+| **Upscale** | Image | Yes | 2x/4x resolution via AI model |
+| **BG Color** | Image | No | Add solid color/gradient behind subject |
+| **BG Image** | Image | No | Place subject on custom background |
+| **Shadow** | Image | No | Add natural drop shadow |
+| **Crop** | Image | No | Auto-crop to subject bounds |
 
-### Processing Pipeline
+---
 
-```
-Input File (R2)
-  -> Validate (type, size, format)
-  -> Rate Limit Check (IP + fingerprint)
-  -> Create Job Record (Supabase)
-  -> Enqueue BullMQ Job
-  -> Worker: Call AI Provider (with fallback)
-  -> Store Output (R2)
-  -> Update Job Status (Supabase)
-  -> Notify Client (SSE/polling)
-```
-
-### Video Processing
-
-Video background removal works in two modes:
-
-1. **Model-based**: Send entire video to an AI model that handles it natively
-2. **Frame-by-frame**: Extract frames, process each through image bg removal, reassemble
-
-The system will start with model-based when available, falling back to frame-by-frame.
-
-## Add-On Features Architecture
-
-After the primary background removal, users can apply additional processing to the result:
-
-### Available Add-Ons
-
-| Add-On | Type | Description |
-|---|---|---|
-| **Upscale** | Image | Increase resolution of the bg-removed image (2x, 4x) |
-| **Background Color** | Image | Add a solid color or gradient behind the subject |
-| **Background Image** | Image | Place subject on a custom background |
-| **Blur Background** | Image/Video | Keep subject sharp, blur the background |
-| **Shadow** | Image | Add natural drop shadow to the isolated subject |
-| **Crop to Subject** | Image | Auto-crop to the subject bounds |
-
-### Add-On Architecture
-
-```typescript
-// packages/core/src/addons/types.ts
-
-interface AddOn {
-  id: string                        // "upscale" | "bg-color" | "bg-image" | "blur" | "shadow" | "crop"
-  name: string
-  type: "image" | "video" | "both"
-  requiresAI: boolean               // true for upscale, false for bg-color
-  params: Record<string, ZodSchema> // validated input params
-  process(input: AddOnInput): Promise<AddOnOutput>
-}
-
-interface AddOnInput {
-  sourceUrl: string                 // URL of the bg-removed result
-  params: Record<string, unknown>   // add-on specific params (color, scale, etc.)
-}
-```
-
-Add-ons that need AI (like upscale) go through the same AI provider system. Simple ones (like adding a background color) run as server-side canvas operations.
-
-### Result Page UX Flow
-
-```
-Upload -> Processing -> Result Preview
-                          |
-                          v
-                    [Download Original]
-                          |
-                    [Add-On Toolbar]
-                    ├── Upscale (2x/4x)
-                    ├── Add BG Color
-                    ├── Add BG Image
-                    ├── Add Shadow
-                    └── Crop to Subject
-                          |
-                    [Apply] -> Re-process -> Updated Preview
-                          |
-                    [Download Final]
-```
-
-## Folder Structure (Updated)
+## Folder Structure
 
 ```
 apps/
 ├── web/
 │   ├── config/
-│   │   ├── site.ts                # Site identity, SEO, analytics
-│   │   └── tool.ts                # Tool settings, file limits, rate limits
+│   │   ├── site.ts
+│   │   └── tool.ts
 │   └── src/
 │       ├── app/
 │       │   ├── api/
+│       │   │   ├── auth/[...all]/route.ts     # BetterAuth handler
 │       │   │   ├── upload/presign/route.ts
 │       │   │   ├── jobs/start/route.ts
 │       │   │   ├── jobs/status/[id]/route.ts
 │       │   │   ├── webhooks/replicate/route.ts
 │       │   │   └── addons/apply/route.ts
+│       │   ├── (auth)/
+│       │   │   ├── login/page.tsx
+│       │   │   ├── signup/page.tsx
+│       │   │   ├── forgot-password/page.tsx
+│       │   │   ├── reset-password/page.tsx
+│       │   │   └── verify-email/page.tsx
+│       │   ├── dashboard/page.tsx
 │       │   └── page.tsx
-│       └── features/
-│           ├── tool/
-│           │   ├── components/
-│           │   │   ├── upload-zone.tsx
-│           │   │   ├── processing-status.tsx
-│           │   │   ├── result-preview.tsx
-│           │   │   └── addon-toolbar.tsx
-│           │   ├── hooks/
-│           │   │   ├── use-upload.ts
-│           │   │   ├── use-job-status.ts
-│           │   │   └── use-addon.ts
-│           │   └── index.ts
-│           ├── marketing/
-│           ├── admin/
-│           ├── auth/
-│           └── billing/
-├── mobile/                          # Future React Native / Expo app
+│       ├── features/
+│       │   ├── tool/
+│       │   ├── marketing/
+│       │   ├── auth/
+│       │   │   ├── components/
+│       │   │   │   ├── login-form.tsx
+│       │   │   │   ├── signup-form.tsx
+│       │   │   │   ├── forgot-password-form.tsx
+│       │   │   │   ├── reset-password-form.tsx
+│       │   │   │   └── magic-link-form.tsx
+│       │   │   └── hooks/
+│       │   │       └── use-auth.ts
+│       │   ├── admin/
+│       │   └── billing/
+│       └── middleware.ts                       # Auth + rate limit middleware
 
 packages/
 ├── core/
 │   ├── src/
-│   │   ├── ai-provider/            # Pluggable AI provider system
-│   │   │   ├── types.ts            # AIProvider interface, PredictionInput/Result types
-│   │   │   ├── registry.ts         # Provider registry with fallback chain
-│   │   │   ├── replicate.ts        # Replicate implementation
-│   │   │   ├── fal.ts              # fal.ai implementation (future)
+│   │   ├── auth/
+│   │   │   ├── auth.ts                        # BetterAuth server instance
+│   │   │   ├── auth-client.ts                 # BetterAuth React client
 │   │   │   └── index.ts
-│   │   ├── addons/                 # Add-on processing system
-│   │   │   ├── types.ts            # AddOn interface
-│   │   │   ├── registry.ts         # Add-on registry
-│   │   │   ├── upscale.ts          # AI-based upscale
-│   │   │   ├── bg-color.ts         # Canvas-based bg color
-│   │   │   ├── bg-image.ts         # Canvas-based bg image
-│   │   │   └── index.ts
+│   │   ├── ai-provider/
+│   │   ├── addons/
 │   │   ├── logger/
 │   │   ├── redis/
 │   │   ├── jobs/
-│   │   │   ├── queues.ts           # BullMQ queue definitions
-│   │   │   ├── tool-worker.ts      # Main tool processing worker
-│   │   │   ├── addon-worker.ts     # Add-on processing worker
-│   │   │   └── logs-worker.ts      # Log batching worker
 │   │   ├── r2/
 │   │   └── billing/
-│   └── index.ts
 ├── database/
-│   └── src/
-│       ├── client.ts
-│       ├── types.ts                # Updated with jobs, addons tables
-│       └── index.ts
+│   ├── src/
+│   │   ├── schema/
+│   │   │   ├── auth.ts                        # BetterAuth-managed tables
+│   │   │   ├── jobs.ts
+│   │   │   ├── addon-jobs.ts
+│   │   │   ├── usage-logs.ts
+│   │   │   └── index.ts
+│   │   ├── migrations/
+│   │   ├── client.ts                          # Drizzle + pg client
+│   │   └── index.ts
+│   ├── drizzle.config.ts
+│   └── package.json
 ├── ui/
 ├── tsconfig/
 └── eslint-config/
 ```
 
-## Database Schema (Updated)
-
-### `jobs` table
-
-| Column | Type | Description |
-|---|---|---|
-| id | uuid | Primary key |
-| idempotency_key | text | Unique key to prevent duplicate requests |
-| input_type | text | "image" or "video" |
-| input_url | text | R2 URL of uploaded file |
-| output_url | text | R2 URL of processed result |
-| status | text | "pending", "processing", "succeeded", "failed", "canceled" |
-| provider | text | "replicate", "fal", etc. |
-| provider_prediction_id | text | External prediction ID |
-| model_used | text | Model identifier used |
-| error_message | text | Error details if failed |
-| metadata | jsonb | Additional data (file size, processing time, etc.) |
-| ip_address | text | Requester IP |
-| fingerprint | text | Device fingerprint |
-| created_at | timestamptz | Job creation time |
-| completed_at | timestamptz | Job completion time |
-
-### `addon_jobs` table
-
-| Column | Type | Description |
-|---|---|---|
-| id | uuid | Primary key |
-| parent_job_id | uuid | FK to jobs.id |
-| addon_type | text | "upscale", "bg-color", etc. |
-| input_url | text | Source image URL (from parent job output) |
-| output_url | text | Processed result URL |
-| status | text | "pending", "processing", "succeeded", "failed" |
-| params | jsonb | Add-on specific parameters |
-| created_at | timestamptz | Creation time |
-
-### `usage_logs` table
-
-| Column | Type | Description |
-|---|---|---|
-| id | uuid | Primary key |
-| ip_address | text | Requester IP |
-| fingerprint | text | Device fingerprint |
-| tool_name | text | e.g., "background-remover" |
-| action | text | "upload", "process", "addon", "download" |
-| metadata | jsonb | Additional context |
-| created_at | timestamptz | Log time |
+---
 
 ## Rate Limiting
 
-- Anonymous users: 5 image removals / hour, 2 video removals / hour
-- Tracked by IP + fingerprint via Redis sliding window
-- Add-ons share the same rate limit pool as the parent operation
+| Endpoint | Limit | Window |
+|---|---|---|
+| Auth (login/signup) | 10 requests | 1 minute |
+| Image bg removal | 5 jobs | 1 hour |
+| Video bg removal | 2 jobs | 1 hour |
+| Add-ons | 10 applications | 1 hour |
+| File upload | 10 uploads | 1 hour |
 
-## Environment Variables (Updated)
+Tracked by: IP + device fingerprint (anonymous) or userId (authenticated) via Redis sliding window.
+
+---
+
+## Environment Variables
 
 ```env
+# BetterAuth
+BETTER_AUTH_SECRET=                         # 32+ char secret (openssl rand -base64 32)
+BETTER_AUTH_URL=http://localhost:3000
+
+# PostgreSQL (self-hosted)
+DATABASE_URL=postgresql://user:password@localhost:5432/cutbackground
+
 # Replicate
 REPLICATE_API_TOKEN=r8_...
 REPLICATE_WEBHOOK_SECRET=whsec_...
-
-# Primary Model
 REPLICATE_MODEL_PRIMARY=851-labs/background-remover
 REPLICATE_MODEL_PRIMARY_VERSION=a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc
-
-# Fallback Model
 REPLICATE_MODEL_FALLBACK=lucataco/remove-bg
 REPLICATE_MODEL_FALLBACK_VERSION=95fcc2a26d3899cd6c2691c900465aaeff466285a65c14638cc5f36f34befaf1
-
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
 
 # Cloudflare R2
 R2_ENDPOINT=...
@@ -339,16 +393,29 @@ R2_BUCKET_NAME=tool-uploads
 # Redis
 REDIS_URL=redis://localhost:6379
 
+# Email (for auth emails: verification, magic link, password reset)
+EMAIL_FROM=noreply@cutbackground.com
+RESEND_API_KEY=re_...
+
 # Site
 NEXT_PUBLIC_SITE_DOMAIN=cutbackground.com
 NEXT_PUBLIC_TOOL_NAME=background-remover
 ```
 
-## Security
+---
 
-- Replicate webhook requests are verified using HMAC signatures
-- R2 presigned URLs expire after 5 minutes (upload) and 1 hour (download)
-- Rate limiting on all API endpoints
-- Input validation with Zod on all routes
-- Row Level Security on Supabase
-- Idempotency keys prevent duplicate processing
+## Security Checklist
+
+- [x] Server-side sessions (not JWT in localStorage)
+- [x] httpOnly, Secure, SameSite cookies
+- [x] CSRF protection on all auth endpoints (BetterAuth built-in)
+- [x] Argon2 password hashing (BetterAuth built-in)
+- [x] Brute force lockout (BetterAuth built-in)
+- [x] Email verification before account activation
+- [x] Session revocation on password change
+- [x] Time-limited, single-use tokens (magic link, password reset)
+- [x] HMAC webhook verification (Replicate)
+- [x] Presigned URL expiration (R2: 5 min upload, 1 hour download)
+- [x] Redis rate limiting on all API endpoints
+- [x] Zod input validation on all routes
+- [x] Idempotency keys to prevent duplicate processing

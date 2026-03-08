@@ -1,184 +1,177 @@
 # Implementation Plan
 
 ## Phase 1: Monorepo Setup & Tooling [COMPLETE]
-- [x] Initialize Turborepo with `pnpm` workspaces.
-- [x] `apps/web`: Next.js 16 App Router with Tailwind CSS.
-- [x] `apps/mobile`: Placeholder for future Expo app.
-- [x] `packages/ui`: Shared component library (Button).
-- [x] `packages/database`: Supabase client, typed schema.
-- [x] `packages/core`: Logger (Pino), Redis, BullMQ, R2, Billing abstraction.
-- [x] `packages/tsconfig`, `packages/eslint-config`: Shared configs.
+- [x] Initialize Turborepo with `pnpm` workspaces
+- [x] `apps/web`: Next.js 16 App Router with Tailwind CSS
+- [x] `apps/mobile`: Placeholder for future Expo app
+- [x] `packages/ui`: Shared component library
+- [x] `packages/tsconfig`, `packages/eslint-config`: Shared configs
 
 ## Phase 2: Homepage & Marketing [COMPLETE]
-- [x] Navbar, Hero, Trusted By (scrolling logos), Use Cases (interactive tabs).
-- [x] How It Works (3-step), Testimonials (amber/sky/magenta cards), CTA, Footer.
-- [x] SEO metadata via `generateMetadata`, OpenGraph.
-- [x] Google Fonts (Inter + Quicksand), Tailwind design system.
+- [x] Navbar, Hero (solid dark bg), Trusted By (scrolling logos)
+- [x] Use Cases (interactive tabs), How It Works (3-step)
+- [x] Testimonials (amber/sky/magenta cards), CTA (sky-50 bg)
+- [x] Footer (solid black, multi-column)
+- [x] SEO metadata, Google Fonts, Tailwind design system
 
-## Phase 3: AI Provider System (packages/core/ai-provider)
+## Phase 3: Database Layer (Drizzle ORM + PostgreSQL)
 
-### 3.1 Provider Interface & Types
-- Create `packages/core/src/ai-provider/types.ts`:
-  - `AIProvider` interface: `createPrediction()`, `getPredictionStatus()`, `cancelPrediction()`
-  - `PredictionInput`, `PredictionResult`, `PredictionStatus` types
-  - `ProviderConfig` type with model, version, and fallback settings
+### 3.1 Setup Drizzle ORM
+- Install `drizzle-orm`, `drizzle-kit`, `pg` in `packages/database`
+- Create `packages/database/src/client.ts`: Drizzle instance with `pg` Pool
+- Create `packages/database/drizzle.config.ts`: migration config pointing to `DATABASE_URL`
 
-### 3.2 Replicate Provider
-- Create `packages/core/src/ai-provider/replicate.ts`:
-  - Install `replicate` npm package
-  - Implement `ReplicateProvider` class conforming to `AIProvider`
-  - Support webhook URL injection on prediction creation
-  - Handle both sync (polling) and async (webhook) modes
-  - Map Replicate-specific response to generic `PredictionResult`
+### 3.2 Define Schema
+- `packages/database/src/schema/auth.ts`: BetterAuth auto-managed tables (user, session, verification, account)
+- `packages/database/src/schema/jobs.ts`: jobs table (id, userId, idempotencyKey, inputType, inputUrl, outputUrl, status, provider, providerPredictionId, modelUsed, errorMessage, metadata, ipAddress, fingerprint, createdAt, completedAt)
+- `packages/database/src/schema/addon-jobs.ts`: addon_jobs table (id, parentJobId, addonType, inputUrl, outputUrl, status, params, createdAt)
+- `packages/database/src/schema/usage-logs.ts`: usage_logs table (id, userId, ipAddress, fingerprint, toolName, action, metadata, createdAt)
+- `packages/database/src/schema/index.ts`: barrel export
 
-### 3.3 Provider Registry with Fallback
-- Create `packages/core/src/ai-provider/registry.ts`:
-  - `AIProviderRegistry` class managing named providers
-  - `runWithFallback(providers[], input)`: try primary, fallback on failure
-  - Idempotency key generation (hash of fileUrl + fingerprint + timestamp)
-  - Duplicate detection: check `jobs` table before creating new prediction
-  - Configurable timeout per provider (default 30s)
+### 3.3 Migrations
+- Run `npx drizzle-kit generate` to create initial migration
+- Run `npx drizzle-kit migrate` to apply to PostgreSQL
+- BetterAuth CLI: `npx @better-auth/cli generate` and `npx @better-auth/cli migrate` for auth tables
 
-### 3.4 Future Providers (Stubs)
-- Create `packages/core/src/ai-provider/fal.ts`: stub for fal.ai
-- Create `packages/core/src/ai-provider/openrouter.ts`: stub for OpenRouter
-- Barrel export from `packages/core/src/ai-provider/index.ts`
+## Phase 4: Authentication (BetterAuth)
 
-## Phase 4: Tool Processing & API Routes
+### 4.1 BetterAuth Server Setup
+- Install `better-auth` in `packages/core`
+- Create `packages/core/src/auth/auth.ts`:
+  - `betterAuth()` instance with Drizzle adapter (`provider: "pg"`)
+  - Enable `emailAndPassword` with `requireEmailVerification: true`
+  - Configure `sendResetPassword` callback (via Resend/Nodemailer)
+  - Add `magicLink` plugin with `sendMagicLink` callback
+  - Session config: 7-day expiry, daily refresh
+  - Rate limit config: 10 req/min on auth endpoints
 
-### 4.1 Database Migrations
-- Create Supabase migration for updated schema:
-  - `jobs` table: id, idempotency_key, input_type, input_url, output_url, status, provider, provider_prediction_id, model_used, error_message, metadata, ip_address, fingerprint, created_at, completed_at
-  - `addon_jobs` table: id, parent_job_id, addon_type, input_url, output_url, status, params, created_at
-  - `usage_logs` table: id, ip_address, fingerprint, tool_name, action, metadata, created_at
-  - RLS policies for public insert, service-role update
+### 4.2 BetterAuth Client Setup
+- Create `packages/core/src/auth/auth-client.ts`:
+  - `createAuthClient()` with `baseURL`
+  - Export hooks: `useSession()`, `signIn`, `signUp`, `signOut`, `forgetPassword`, `resetPassword`
 
-### 4.2 Upload API
-- `apps/web/src/app/api/upload/presign/route.ts`:
-  - Validate file type and size using `config/tool.ts`
-  - Generate R2 presigned upload URL (5 min expiry)
-  - Return presigned URL + unique file key
+### 4.3 Next.js Route Handler
+- Create `apps/web/src/app/api/auth/[...all]/route.ts`:
+  - Import auth from `@repo/core/auth`
+  - Export `{ POST, GET }` via `toNextJsHandler(auth)`
 
-### 4.3 Job Start API
-- `apps/web/src/app/api/jobs/start/route.ts`:
-  - Validate request (Zod schema)
-  - Rate limit check (Redis: IP + fingerprint)
-  - Generate idempotency key, check for duplicates in `jobs` table
-  - Create job record in Supabase (status: "pending")
-  - Enqueue BullMQ job with file reference + job ID
-  - Return job ID to client
+### 4.4 Auth Middleware
+- Create `apps/web/middleware.ts`:
+  - Protect routes: `/dashboard`, `/settings`, `/api/jobs`
+  - Validate session via `auth.api.getSession({ headers })`
+  - Redirect unauthenticated users to `/login`
+  - Apply Redis rate limiting to all API routes
 
-### 4.4 BullMQ Tool Worker
-- Update `packages/core/src/jobs/tool-worker.ts`:
-  - Dequeue job, fetch file URL from Supabase
-  - Detect input type (image vs video)
-  - Call AI provider registry with fallback chain
-  - For images: send R2 URL to Replicate (851-labs primary, lucataco fallback)
-  - For videos: send to video-specific model or frame-by-frame processing
-  - On success: upload output to R2, update job status + output_url
-  - On failure: log error, update job status, retry up to 3 times
+### 4.5 Auth Pages
+- `apps/web/src/app/(auth)/login/page.tsx`: email/password + magic link option
+- `apps/web/src/app/(auth)/signup/page.tsx`: email/password registration
+- `apps/web/src/app/(auth)/forgot-password/page.tsx`: request reset email
+- `apps/web/src/app/(auth)/reset-password/page.tsx`: set new password (via token from email)
+- `apps/web/src/app/(auth)/verify-email/page.tsx`: email verification confirmation
 
-### 4.5 Replicate Webhook Handler
-- `apps/web/src/app/api/webhooks/replicate/route.ts`:
-  - Verify HMAC signature from Replicate
-  - Extract jobId from query params
-  - Update job status in Supabase based on webhook payload
-  - If "succeeded": download output from Replicate, upload to R2, update output_url
-  - If "failed": update error_message, optionally trigger fallback
+### 4.6 Auth Feature Components
+- `features/auth/components/login-form.tsx`: email + password fields, "Forgot password?" link, "Sign in with magic link" toggle
+- `features/auth/components/signup-form.tsx`: email + password + confirm password, Zod validation
+- `features/auth/components/forgot-password-form.tsx`: email input, submit sends reset link
+- `features/auth/components/reset-password-form.tsx`: new password + confirm, validates token from URL
+- `features/auth/components/magic-link-form.tsx`: email input, submit sends magic link
 
-### 4.6 Job Status API
-- `apps/web/src/app/api/jobs/status/[id]/route.ts`:
-  - Fetch job from Supabase by ID
-  - Return current status, output_url if completed
-  - Support SSE streaming for real-time updates (optional, polling as default)
+### 4.7 Email Service
+- Install `resend` (or `nodemailer` for self-hosted SMTP)
+- Create `packages/core/src/email/send.ts`: generic email sending utility
+- Email templates: verification, magic link, password reset
+- All emails include: brand header, clear CTA button, expiry notice
 
-## Phase 5: Add-On Features System
+### 4.8 Security Hardening
+- Session revocation on password change (BetterAuth: `revokeOtherSessions: true`)
+- Brute force lockout after 5 failed login attempts (15 min cooldown)
+- Magic link tokens: 15 min expiry, single-use
+- Password reset tokens: 1 hour expiry, single-use
+- CSRF protection: automatic via BetterAuth
+- httpOnly + Secure + SameSite=Lax cookies
 
-### 5.1 Add-On Interface & Registry
-- Create `packages/core/src/addons/types.ts`:
-  - `AddOn` interface: id, name, type, requiresAI, params schema, process()
-  - `AddOnInput`, `AddOnOutput` types
-- Create `packages/core/src/addons/registry.ts`:
-  - `AddOnRegistry` class managing available add-ons
-  - `getAvailableAddOns(inputType)`: returns add-ons for image or video
+## Phase 5: AI Provider System
 
-### 5.2 Non-AI Add-Ons (Server-Side Canvas)
-- `packages/core/src/addons/bg-color.ts`: add solid color/gradient behind subject
-- `packages/core/src/addons/crop.ts`: auto-crop to subject bounds
-- `packages/core/src/addons/shadow.ts`: add drop shadow
+### 5.1 Provider Interface & Types
+- Create `packages/core/src/ai-provider/types.ts`: AIProvider, PredictionInput, PredictionResult
+- Create `packages/core/src/ai-provider/registry.ts`: provider registry with fallback chain
+- Idempotency key: hash(fileUrl + fingerprint + timestamp)
 
-### 5.3 AI-Powered Add-Ons
-- `packages/core/src/addons/upscale.ts`: call upscale model via AI provider
-- `packages/core/src/addons/bg-image.ts`: composite subject onto background image
+### 5.2 Replicate Provider
+- Install `replicate` npm package
+- Create `packages/core/src/ai-provider/replicate.ts`: implements AIProvider
+- Webhook URL injection on prediction creation
+- Map Replicate responses to generic PredictionResult
 
-### 5.4 Add-On API Route
-- `apps/web/src/app/api/addons/apply/route.ts`:
-  - Validate request (parent_job_id, addon_type, params)
-  - Rate limit check
-  - Create `addon_jobs` record
-  - Enqueue BullMQ addon job
-  - Return addon job ID
+### 5.3 Future Provider Stubs
+- `packages/core/src/ai-provider/fal.ts`: stub for fal.ai
+- `packages/core/src/ai-provider/openrouter.ts`: stub for OpenRouter
 
-### 5.5 BullMQ Add-On Worker
-- Create `packages/core/src/jobs/addon-worker.ts`:
-  - Dequeue add-on job
-  - Fetch source image from parent job output_url
-  - Run the add-on processor
-  - Upload result to R2
-  - Update addon_jobs status + output_url
+## Phase 6: Tool Processing & API Routes
 
-## Phase 6: Tool UI Components
+### 6.1 Upload API
+- `apps/web/src/app/api/upload/presign/route.ts`: validate file, generate R2 presigned URL
 
-### 6.1 Upload Zone
-- `features/tool/components/upload-zone.tsx`:
-  - Drag-and-drop with click-to-browse
-  - File type/size validation (client-side with Zod)
-  - Upload progress bar (direct to R2)
-  - Support both image and video upload
+### 6.2 Job Start API
+- `apps/web/src/app/api/jobs/start/route.ts`: validate, rate limit, create job in DB, enqueue BullMQ
 
-### 6.2 Processing Status
-- `features/tool/components/processing-status.tsx`:
-  - React Query polling on `/api/jobs/status/[id]`
-  - Animated progress indicator
-  - Status text: "Uploading...", "Processing...", "Almost done..."
+### 6.3 BullMQ Tool Worker
+- `packages/core/src/jobs/tool-worker.ts`: dequeue, call AI provider with fallback, store output, update status
 
-### 6.3 Result Preview
-- `features/tool/components/result-preview.tsx`:
-  - Display bg-removed image on checkerboard transparency
-  - Before/After slider comparison
-  - Download button (transparent PNG)
+### 6.4 Replicate Webhook
+- `apps/web/src/app/api/webhooks/replicate/route.ts`: verify HMAC, update job, download output to R2
 
-### 6.4 Add-On Toolbar
-- `features/tool/components/addon-toolbar.tsx`:
-  - Horizontal toolbar below result preview
-  - Buttons: Upscale, Add BG Color, Add BG Image, Add Shadow, Crop
-  - Each opens a modal/panel with add-on specific options
-  - Apply button triggers add-on processing
-  - Updated preview after add-on completes
+### 6.5 Job Status API
+- `apps/web/src/app/api/jobs/status/[id]/route.ts`: return job status and output URL
 
-### 6.5 React Query Hooks
-- `features/tool/hooks/use-upload.ts`: manage presign + upload flow
-- `features/tool/hooks/use-job-status.ts`: poll job status with React Query
-- `features/tool/hooks/use-addon.ts`: trigger and track add-on processing
+## Phase 7: Add-On Features
 
-## Phase 7: SEO Automation
-- Next.js `generateMetadata` dynamically mapping to `config/site.ts`.
-- `sitemap.ts` and `robots.ts` auto-generation.
-- `/app/llms.txt/route.ts` for AI crawler guidance.
-- Structured `JSON-LD` schemas (FAQ, HowTo) in root layout.
-- Blog pipeline with `next-mdx-remote`.
-- i18n with `next-intl`.
+### 7.1 Add-On Interface
+- `packages/core/src/addons/types.ts`: AddOn interface with id, name, type, process()
+- `packages/core/src/addons/registry.ts`: available add-ons by input type
 
-## Phase 8: Deployment & DevOps
-- **Docker/Coolify**: Multi-stage `Dockerfile` with `output: 'standalone'`.
-- **Netlify**: `netlify.toml` with edge function config.
-- **Vercel**: `vercel.json` for custom headers/redirects.
-- CI/CD with GitHub Actions (lint, build, deploy).
+### 7.2 Implementations
+- `bg-color.ts`: server-side canvas, add solid color/gradient
+- `crop.ts`: auto-crop to subject bounds
+- `shadow.ts`: add drop shadow
+- `upscale.ts`: AI-based upscale via provider system
+- `bg-image.ts`: composite subject onto background
 
-## Phase 9: Verification & Launch
-- Lighthouse audit (mobile + desktop).
-- Rate limit integration testing.
-- Replicate webhook verification.
-- Cross-package import validation.
-- Docker build and run test.
-- End-to-end flow: upload -> process -> result -> add-on -> download.
+### 7.3 Add-On API + Worker
+- `apps/web/src/app/api/addons/apply/route.ts`: validate, create addon_job, enqueue
+- `packages/core/src/jobs/addon-worker.ts`: process add-on, upload result to R2
+
+## Phase 8: Tool UI Components
+
+### 8.1 Upload Zone
+- Drag-and-drop + click-to-browse, file validation, upload progress
+
+### 8.2 Processing Status
+- React Query polling, animated progress, status text updates
+
+### 8.3 Result Preview
+- Checkerboard transparency, before/after slider, download button
+
+### 8.4 Add-On Toolbar
+- Horizontal toolbar: Upscale, BG Color, BG Image, Shadow, Crop
+- Modal/panel for each with apply button
+
+## Phase 9: SEO Automation
+- `generateMetadata` from `config/site.ts`
+- `sitemap.ts`, `robots.ts` auto-generation
+- JSON-LD schemas (FAQ, HowTo)
+- Blog pipeline with `next-mdx-remote`
+- i18n with `next-intl`
+
+## Phase 10: Deployment & DevOps
+- Docker multi-stage build with `output: 'standalone'`
+- `netlify.toml` for edge functions
+- CI/CD with GitHub Actions
+
+## Phase 11: Verification & Launch
+- Lighthouse audit
+- Auth flow testing: signup, login, magic link, forgot/reset password, logout
+- Session security testing: cookie flags, CSRF, revocation
+- Rate limit testing
+- Replicate webhook verification
+- End-to-end: upload, process, result, add-on, download
