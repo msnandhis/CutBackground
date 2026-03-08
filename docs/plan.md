@@ -1,349 +1,354 @@
-Project Goal
+# CutBackground: Architecture & Plan
 
-Create a production-ready web application boilerplate for building SEO-optimized online tools. The template should be scalable, cleanly architected, and suitable for launching many different tool websites quickly. The project must be designed so that each new tool site can reuse the boilerplate and only change configuration and processing logic.
+## Project Goal
 
-The codebase should prioritize maintainability, performance, SEO, and clean user experience.
+Create a production-ready web application for AI-powered background removal from images and videos. Built as a scalable monorepo boilerplate that can be reused to launch multiple AI tool websites quickly.
 
-Tech Stack
+## Tech Stack
 
-Use the following stack:
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Framework** | Next.js 16 (App Router) | SSR, SEO, routing, server components |
+| **Language** | TypeScript 5 | Type safety across the entire stack |
+| **Styling** | Tailwind CSS 3.4 | Fast UI development, consistent design system |
+| **State** | React Query (TanStack) | Client-side cache, polling, optimistic updates |
+| **Validation** | Zod | Runtime validation for forms, API payloads, env vars |
+| **Database** | Supabase | PostgreSQL, Auth, Row Level Security |
+| **Auth** | Supabase Auth (SSR) | Session handling, user identity, OAuth |
+| **Storage** | Cloudflare R2 | S3-compatible object storage for uploads/outputs |
+| **Queue** | BullMQ + Redis | Background job processing, rate limiting, log batching |
+| **Logging** | Pino | Fast, structured JSON logging with request context |
+| **AI Provider** | Replicate (primary), fal.ai, Gemini, OpenRouter (future) | AI model inference via pluggable provider system |
+| **Monorepo** | Turborepo + pnpm | Shared packages, parallel builds, caching |
 
-Next.js (latest stable version) with App Router
-TypeScript
-Tailwind CSS (Purpose: Fast UI development and consistent design system)
-React Query (Purpose: Client-side cache for interactive features, polling, and optimistic updates)
-Zod (Purpose: Runtime validation for forms, API request payloads, and processing inputs)
-Supabase (Purpose: Database)
-Supabase SSR Client & Auth (Purpose: Session handling, user identity)
-Cloudflare R2 (Purpose: Object storage for tool input/output files)
-BullMQ + Self-hosted Redis (Purpose: Background job processing, rate limiting, and batching logs)
-Pino (Purpose: Fast, structured JSON logging across all environments)
-Server actions, API routes, or BullMQ Workers for tool processing
-Edge-compatible architecture when possible
+## AI Provider Architecture
 
-The project must be structured for production deployment.
+### Design Principle: Pluggable Provider System
 
-Project Objectives
+All AI model calls go through an abstract `AIProvider` interface. This ensures:
+- Easy switching between providers (Replicate, fal.ai, Gemini, OpenRouter)
+- Fallback chains when a primary provider fails
+- Per-operation cost tracking
+- Webhook support for async predictions
 
-The template will power websites like:
+### Provider Interface
 
-Video watermark remover
-Background remover
-AI face generator
-Video subtitle generator
-Face comparison tools
+```typescript
+// packages/core/src/ai-provider/types.ts
 
-Each website will contain a single main tool with supporting SEO pages.
+interface AIProvider {
+  name: string
+  createPrediction(params: PredictionInput): Promise<PredictionResult>
+  getPredictionStatus(id: string): Promise<PredictionStatus>
+  cancelPrediction(id: string): Promise<void>
+  supportsWebhook: boolean
+}
 
-The architecture must use a scalable Monorepo (e.g., Turborepo + pnpm workspaces) to support both the Next.js web application and future mobile applications. Both apps will share a core set of internal packages (`packages/*`). This drastically speeds up iteration while still keeping business logic decoupled.
+interface PredictionInput {
+  model: string                    // e.g., "851-labs/background-remover"
+  version?: string                 // specific version hash
+  input: Record<string, unknown>   // model-specific input
+  webhookUrl?: string              // callback URL for async results
+  webhookEvents?: string[]         // ["start", "completed"]
+}
 
-Focus on:
+interface PredictionResult {
+  id: string
+  status: "starting" | "processing" | "succeeded" | "failed" | "canceled"
+  output?: unknown
+  error?: string
+  provider: string
+}
+```
 
-excellent SEO structure
-very fast load performance
-clean UI and UX
-rate limiting for free usage
-future upgrade path for paid plans
+### Replicate Configuration
 
-Do not hardcode anything tool specific.
+**Primary Model (images):**
+- `851-labs/background-remover:a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc`
+- Cost: ~$0.00048/run, T4 GPU, ~3 seconds
 
-Use configuration files instead.
+**Fallback Model (images):**
+- `lucataco/remove-bg:95fcc2a26d3899cd6c2691c900465aaeff466285a65c14638cc5f36f34befaf1`
 
-Folder Structure
+**Video Models (future):**
+- Video background removal models will be added as they become available on Replicate
 
-Design a clear and scalable Turborepo Monorepo structure.
+### Fallback Strategy
 
-Example structure (Feature-Based Architecture):
+```
+Request arrives
+  -> Try Primary Model (851-labs/background-remover)
+  -> If fails/timeout after 30s -> Try Fallback (lucataco/remove-bg)
+  -> If both fail -> Return error with retry option
+```
 
+Deduplication: Each job gets a unique `idempotencyKey` (hash of file URL + user fingerprint + timestamp). Before creating a prediction, the system checks if one already exists in the `jobs` table with the same key.
+
+### Webhook Flow
+
+```
+1. User uploads image to R2 -> gets presigned URL
+2. API creates BullMQ job with file reference
+3. BullMQ worker calls Replicate API with webhook URL
+4. Replicate sends POST to /api/webhooks/replicate when done
+5. Webhook handler updates job status in Supabase
+6. Client polls /api/jobs/status/[id] or receives SSE update
+```
+
+Webhook URL format: `https://{domain}/api/webhooks/replicate?jobId={id}&secret={hmac}`
+
+## Tool Processing: Images & Videos
+
+### Input Types
+
+| Type | Formats | Max Size | Processing |
+|---|---|---|---|
+| **Image** | PNG, JPG, JPEG, WebP | 10MB | Background removal, transparent PNG output |
+| **Video** | MP4, WebM, MOV | 50MB | Frame-by-frame or model-based bg removal |
+
+### Processing Pipeline
+
+```
+Input File (R2)
+  -> Validate (type, size, format)
+  -> Rate Limit Check (IP + fingerprint)
+  -> Create Job Record (Supabase)
+  -> Enqueue BullMQ Job
+  -> Worker: Call AI Provider (with fallback)
+  -> Store Output (R2)
+  -> Update Job Status (Supabase)
+  -> Notify Client (SSE/polling)
+```
+
+### Video Processing
+
+Video background removal works in two modes:
+
+1. **Model-based**: Send entire video to an AI model that handles it natively
+2. **Frame-by-frame**: Extract frames, process each through image bg removal, reassemble
+
+The system will start with model-based when available, falling back to frame-by-frame.
+
+## Add-On Features Architecture
+
+After the primary background removal, users can apply additional processing to the result:
+
+### Available Add-Ons
+
+| Add-On | Type | Description |
+|---|---|---|
+| **Upscale** | Image | Increase resolution of the bg-removed image (2x, 4x) |
+| **Background Color** | Image | Add a solid color or gradient behind the subject |
+| **Background Image** | Image | Place subject on a custom background |
+| **Blur Background** | Image/Video | Keep subject sharp, blur the background |
+| **Shadow** | Image | Add natural drop shadow to the isolated subject |
+| **Crop to Subject** | Image | Auto-crop to the subject bounds |
+
+### Add-On Architecture
+
+```typescript
+// packages/core/src/addons/types.ts
+
+interface AddOn {
+  id: string                        // "upscale" | "bg-color" | "bg-image" | "blur" | "shadow" | "crop"
+  name: string
+  type: "image" | "video" | "both"
+  requiresAI: boolean               // true for upscale, false for bg-color
+  params: Record<string, ZodSchema> // validated input params
+  process(input: AddOnInput): Promise<AddOnOutput>
+}
+
+interface AddOnInput {
+  sourceUrl: string                 // URL of the bg-removed result
+  params: Record<string, unknown>   // add-on specific params (color, scale, etc.)
+}
+```
+
+Add-ons that need AI (like upscale) go through the same AI provider system. Simple ones (like adding a background color) run as server-side canvas operations.
+
+### Result Page UX Flow
+
+```
+Upload -> Processing -> Result Preview
+                          |
+                          v
+                    [Download Original]
+                          |
+                    [Add-On Toolbar]
+                    ├── Upscale (2x/4x)
+                    ├── Add BG Color
+                    ├── Add BG Image
+                    ├── Add Shadow
+                    └── Crop to Subject
+                          |
+                    [Apply] -> Re-process -> Updated Preview
+                          |
+                    [Download Final]
+```
+
+## Folder Structure (Updated)
+
+```
 apps/
-├─ web/                  
-│  ├─ src/
-│  │  ├─ app/            # Next.js App Router (Public facing routes)
-│  │  ├─ features/       # Feature-Based Architecture
-│  │  │  ├─ admin/       # Future admin dashboards & logic
-│  │  │  ├─ auth/        # Authentication & user profile logic
-│  │  │  ├─ billing/     # Stripe/Credits logic
-│  │  │  ├─ marketing/   # SEO pages, blog, landing pages
-│  │  │  └─ tool/        # Core tool UI and processing logic
-│  │  └─ shared/         # App-specific shared utilities
-│  ├─ config/site.ts     
-│  └─ config/tool.ts     
-└─ mobile/               
+├── web/
+│   ├── config/
+│   │   ├── site.ts                # Site identity, SEO, analytics
+│   │   └── tool.ts                # Tool settings, file limits, rate limits
+│   └── src/
+│       ├── app/
+│       │   ├── api/
+│       │   │   ├── upload/presign/route.ts
+│       │   │   ├── jobs/start/route.ts
+│       │   │   ├── jobs/status/[id]/route.ts
+│       │   │   ├── webhooks/replicate/route.ts
+│       │   │   └── addons/apply/route.ts
+│       │   └── page.tsx
+│       └── features/
+│           ├── tool/
+│           │   ├── components/
+│           │   │   ├── upload-zone.tsx
+│           │   │   ├── processing-status.tsx
+│           │   │   ├── result-preview.tsx
+│           │   │   └── addon-toolbar.tsx
+│           │   ├── hooks/
+│           │   │   ├── use-upload.ts
+│           │   │   ├── use-job-status.ts
+│           │   │   └── use-addon.ts
+│           │   └── index.ts
+│           ├── marketing/
+│           ├── admin/
+│           ├── auth/
+│           └── billing/
+├── mobile/                          # Future React Native / Expo app
 
 packages/
-├─ ui/                   # Shared Tailwind and layout components
-├─ database/             # Supabase schema, typed clients, auth
-├─ core/                 # Shared business logic
-│  ├─ logger/            # Pino structured logging utilities (`logger.ts`, `requestLogger.ts`)
-│  ├─ billing/           # Abstracted Payment Gateway interface (Stripe vs LemonSqueezy)
-│  ├─ jobs/              # BullMQ queue definitions and workers
-│  └─ redis/             # Redis connection and rate limits
-├─ tsconfig/             # Shared TypeScript config
-└─ eslint-config/        # Shared ESLint config
-
-The architecture must perfectly separate UI components (`packages/ui`), core logic (`packages/core`), and tool-specific configurations (`apps/web/config`).
-
-Configuration Driven System
-
-The template must use configuration files to control the behavior of the website.
-
-site configuration should include:
-
-site name
-domain
-description
-SEO keywords
-main product URL for traffic redirection
-
-tool configuration should include:
-
-tool name
-input type (image, video, audio, text)
-output type
-file size limits
-rate limit per user
-supported formats
-
-Changing these configuration files should allow the template to power a completely different tool website.
-
-User Experience Requirements
-
-The UI must feel like a professional SaaS tool, not a generic template.
-
-Design a minimal and modern interface.
-
-Use the following design system:
-
-Primary color
-#FF0076
-
-Dark brand background
-#12131A
-
-Light section background
-#f0faff
-
-White
-#FFFFFF
-
-Neutral gray scale
-#f6f6f7 to #333333
-
-Success color
-#10B981
-
-Typography:
-
-Headings use Quicksand
-Body text uses Inter
-
-Use large readable typography with strong hierarchy.
-
-Buttons:
-
-Primary CTA buttons use the brand magenta color with rounded full style.
-
-Secondary buttons should use outline styles.
-
-Cards should have subtle shadows and hover lift effects.
-
-Animations should be subtle and smooth.
-
-The interface must feel clean and fast.
-
-Layout Structure
-
-The website should follow this structure:
-
-Header navigation
-
-Hero section containing tool title and upload interface
-
-Tool interface section
-
-Hero section containing tool title and upload interface
-
-Tool interface section
-
-Ad placement slot (capable of supporting Carbon Ads, AdSense, or promotional banners)
-
-How it works section
-
-Use cases section
-
-FAQ section
-
-Related tools section
-
-Footer
-
-All sections must be responsive.
-
-Mobile first design is required.
-
-SEO Requirements
-
-The project must be optimized for search engines.
-
-Implement:
-
-dynamic metadata generation (`generateMetadata` API)
-structured data schema (JSON-LD script tags)
-FAQ schema
-OpenGraph and Twitter metadata
-Auto-generated `sitemap.xml` for all static pages, blog posts, and dynamic routes
-Auto-generated `robots.txt`
-Auto-generated `llms.txt` to provide clean AI crawler parsing of site context
-Internationalization (i18n) allowing dynamic localized routes (e.g. `/es`, `/fr`) to multiply global traffic
-
-Include built-in SEO sections like:
-
-FAQ block
-how it works
-use cases
-
-Pages should load extremely fast.
-
-Use static rendering when possible.
-
-Include a `blog` section for long-form content marketing (using next-mdx-remote or similar) to capture long-tail SEO traffic.
-
-Performance Requirements
-
-The project must achieve high Lighthouse scores.
-
-Use optimized image loading.
-
-Avoid unnecessary client JavaScript.
-
-Use server components where possible.
-
-Minimize bundle size.
-
-Tool Interaction Flow
-
-The tool page should follow this user flow:
-
-user uploads file directly to Cloudflare R2 via presigned URL
-client pings Next.js API with file reference
-system validates input and checks rate limits
-processing state is shown
-Next.js enqueues a processing job to BullMQ
-BullMQ worker processes the file in the background (avoiding serverless timeouts)
-client listens for updates via Server-Sent Events (SSE) or polling
-result preview is displayed
-user can download or copy result
-result screen should also show a CTA promoting the main platform.
-
-Database Design
-
-Use Supabase with minimal schema.
-
-Tables should include:
-
-usage_logs
-
-fields:
-id
-ip_address
-device_fingerprint
-tool_name
-created_at
-
-jobs
-
-fields:
-id
-status
-input_url
-output_url
-error_message
-metadata (JSONB)
-created_at
-
-This allows tracking tool usage and future expansion.
-
-Rate Limiting
-
-Implement rate limiting for anonymous users.
-
-Rate limiting should run in edge middleware using self-hosted Redis.
-Anonymous users should be tracked using a combination of IP address and device fingerprinting (e.g., FingerprintJS or similar lightweight client hashing).
-
-Users exceeding limits should see a friendly message.
-
-Future Paid Plan Support
-
-The architecture must support adding:
-
-user accounts (via Supabase Auth)
-credits system
-subscription plans
-
-**Billing Abstraction**: The codebase must implement an abstract Payment Gateway interface (`packages/core/billing`) so swapping between providers like Stripe and LemonSqueezy later only requires updating a single config file, keeping the `features/billing` module entirely provider-agnostic.
-
-Logging & Observability
-
-To support deploying many standalone tool sites safely, the boilerplate must use **Structured Logging**.
-
-Use **Pino** for extremely fast, structured JSON logging to automatically attach metadata (domain, tool name, endpoint, requestId, timestamp) to every log event. All log events (API routes, job starts/failures, AI requests, rate limits) should use this interface.
-
-*Performance Optimization*: To avoid database bottlenecking by writing a Postgres row on every request log, the system should push log events to **BullMQ** (via Redis). A scheduled BullMQ worker should batch-insert the structured logs into the Supabase `usage_logs` table at routine intervals (e.g., every 10 seconds).
-
-Analytics
-
-Include a simple analytics integration layer.
-
-The analytics system should track:
-
-page views
-tool usage
-conversion clicks
-
-Keep it modular so analytics providers can be swapped.
-
-Accessibility
-
-Ensure accessibility best practices.
-
-Include:
-
-keyboard navigation
-visible focus states
-ARIA attributes where needed
-sufficient color contrast
-
-Code Quality
-
-Write clean TypeScript code.
-
-Use consistent naming conventions.
-
-Organize components logically.
-
-Avoid deeply nested components.
-
-Ensure the code looks like it was written by an experienced engineer.
-
-Documentation
-
-Add a short README explaining:
-
-how to run the project
-how to change site configuration
-how to change tool logic
-how to deploy the site natively (Vercel/Netlify)
-how to build the Docker image (Coolify)
-
-Deployment Support
-
-The boilerplate must support three first-class deployment targets:
-1. Serverless/Edge deployments (Vercel).
-2. Netlify (via `@netlify/plugin-nextjs`).
-3. Self-Hosted Docker (Provide a robust `Dockerfile` optimized for Next.js standalone output to easily deploy on Coolify or bare-metal VPS).
-
-Final Goal
-
-The result should be a professional, production-ready boilerplate that can be reused to launch many SEO tool websites quickly.
-
-It should feel like a real startup project, not an auto-generated template.
+├── core/
+│   ├── src/
+│   │   ├── ai-provider/            # Pluggable AI provider system
+│   │   │   ├── types.ts            # AIProvider interface, PredictionInput/Result types
+│   │   │   ├── registry.ts         # Provider registry with fallback chain
+│   │   │   ├── replicate.ts        # Replicate implementation
+│   │   │   ├── fal.ts              # fal.ai implementation (future)
+│   │   │   └── index.ts
+│   │   ├── addons/                 # Add-on processing system
+│   │   │   ├── types.ts            # AddOn interface
+│   │   │   ├── registry.ts         # Add-on registry
+│   │   │   ├── upscale.ts          # AI-based upscale
+│   │   │   ├── bg-color.ts         # Canvas-based bg color
+│   │   │   ├── bg-image.ts         # Canvas-based bg image
+│   │   │   └── index.ts
+│   │   ├── logger/
+│   │   ├── redis/
+│   │   ├── jobs/
+│   │   │   ├── queues.ts           # BullMQ queue definitions
+│   │   │   ├── tool-worker.ts      # Main tool processing worker
+│   │   │   ├── addon-worker.ts     # Add-on processing worker
+│   │   │   └── logs-worker.ts      # Log batching worker
+│   │   ├── r2/
+│   │   └── billing/
+│   └── index.ts
+├── database/
+│   └── src/
+│       ├── client.ts
+│       ├── types.ts                # Updated with jobs, addons tables
+│       └── index.ts
+├── ui/
+├── tsconfig/
+└── eslint-config/
+```
+
+## Database Schema (Updated)
+
+### `jobs` table
+
+| Column | Type | Description |
+|---|---|---|
+| id | uuid | Primary key |
+| idempotency_key | text | Unique key to prevent duplicate requests |
+| input_type | text | "image" or "video" |
+| input_url | text | R2 URL of uploaded file |
+| output_url | text | R2 URL of processed result |
+| status | text | "pending", "processing", "succeeded", "failed", "canceled" |
+| provider | text | "replicate", "fal", etc. |
+| provider_prediction_id | text | External prediction ID |
+| model_used | text | Model identifier used |
+| error_message | text | Error details if failed |
+| metadata | jsonb | Additional data (file size, processing time, etc.) |
+| ip_address | text | Requester IP |
+| fingerprint | text | Device fingerprint |
+| created_at | timestamptz | Job creation time |
+| completed_at | timestamptz | Job completion time |
+
+### `addon_jobs` table
+
+| Column | Type | Description |
+|---|---|---|
+| id | uuid | Primary key |
+| parent_job_id | uuid | FK to jobs.id |
+| addon_type | text | "upscale", "bg-color", etc. |
+| input_url | text | Source image URL (from parent job output) |
+| output_url | text | Processed result URL |
+| status | text | "pending", "processing", "succeeded", "failed" |
+| params | jsonb | Add-on specific parameters |
+| created_at | timestamptz | Creation time |
+
+### `usage_logs` table
+
+| Column | Type | Description |
+|---|---|---|
+| id | uuid | Primary key |
+| ip_address | text | Requester IP |
+| fingerprint | text | Device fingerprint |
+| tool_name | text | e.g., "background-remover" |
+| action | text | "upload", "process", "addon", "download" |
+| metadata | jsonb | Additional context |
+| created_at | timestamptz | Log time |
+
+## Rate Limiting
+
+- Anonymous users: 5 image removals / hour, 2 video removals / hour
+- Tracked by IP + fingerprint via Redis sliding window
+- Add-ons share the same rate limit pool as the parent operation
+
+## Environment Variables (Updated)
+
+```env
+# Replicate
+REPLICATE_API_TOKEN=r8_...
+REPLICATE_WEBHOOK_SECRET=whsec_...
+
+# Primary Model
+REPLICATE_MODEL_PRIMARY=851-labs/background-remover
+REPLICATE_MODEL_PRIMARY_VERSION=a029dff38972b5fda4ec5d75d7d1cd25aeff621d2cf4946a41055d7db66b80bc
+
+# Fallback Model
+REPLICATE_MODEL_FALLBACK=lucataco/remove-bg
+REPLICATE_MODEL_FALLBACK_VERSION=95fcc2a26d3899cd6c2691c900465aaeff466285a65c14638cc5f36f34befaf1
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+
+# Cloudflare R2
+R2_ENDPOINT=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=tool-uploads
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# Site
+NEXT_PUBLIC_SITE_DOMAIN=cutbackground.com
+NEXT_PUBLIC_TOOL_NAME=background-remover
+```
+
+## Security
+
+- Replicate webhook requests are verified using HMAC signatures
+- R2 presigned URLs expire after 5 minutes (upload) and 1 hour (download)
+- Rate limiting on all API endpoints
+- Input validation with Zod on all routes
+- Row Level Security on Supabase
+- Idempotency keys prevent duplicate processing

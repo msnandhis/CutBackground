@@ -33,3 +33,22 @@ h6 {
   outline: 2px solid var(--brand-magenta);
   outline-offset: 2px;
 }
+
+/* Scrolling animation for Trusted By logos */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-33.333%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 20s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}

@@ -2,10 +2,10 @@
 
 # ✂️ CutBackground
 
-### Free AI-Powered Background Remover — Remove Image Backgrounds in Seconds
+### Free AI-Powered Background Remover | Remove Image Backgrounds in Seconds
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwindcss)](https://tailwindcss.com)
 [![Turborepo](https://img.shields.io/badge/Turborepo-Monorepo-EF4444?logo=turborepo)](https://turbo.build)
@@ -18,7 +18,7 @@
 
 ## 🎯 About
 
-**CutBackground** is a production-ready, SEO-optimized web application for removing image backgrounds instantly using AI. Upload any image — product photo, headshot, or graphic — and get a clean transparent PNG in seconds. No signup, no watermark, no limits on quality.
+**CutBackground** is a production-ready, SEO-optimized web application for removing image backgrounds instantly using AI. Upload any image (product photo, headshot, or graphic) and get a clean transparent PNG in seconds. No signup, no watermark, no limits on quality.
 
 Built as a **scalable monorepo boilerplate**, the architecture is designed to launch multiple AI tool websites quickly (e.g., video watermark remover, face generator, subtitle extractor) by swapping only the processing logic and page content.
 
@@ -28,7 +28,7 @@ Built as a **scalable monorepo boilerplate**, the architecture is designed to la
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| **Framework** | Next.js 15 (App Router) | SSR, SEO, routing, server components |
+| **Framework** | Next.js 16 (App Router) | SSR, SEO, routing, server components |
 | **Language** | TypeScript 5 | Type safety across the entire stack |
 | **Styling** | Tailwind CSS 3.4 | Fast UI development, consistent design system |
 | **State** | React Query (TanStack) | Client-side cache, polling, optimistic updates |
@@ -86,9 +86,9 @@ CutBackground/
 
 ### Prerequisites
 
-- **Node.js** ≥ 18
-- **pnpm** ≥ 9 (`npm install -g pnpm`)
-- **Redis** (for BullMQ & rate limiting — self-hosted or cloud)
+- **Node.js** >= 18
+- **pnpm** >= 9 (`npm install -g pnpm`)
+- **Redis** (for BullMQ & rate limiting, self-hosted or cloud)
 
 ### Installation
 
@@ -165,23 +165,23 @@ Works with **Coolify**, **Railway**, or any Docker-compatible platform.
 
 ## 🏗️ Current Progress
 
-### ✅ Phase 1 — Monorepo Foundation (Complete)
+### ✅ Phase 1: Monorepo Foundation (Complete)
 - Turborepo + pnpm workspace scaffolding
 - Shared TypeScript configurations (`base`, `nextjs`, `library`)
 - Shared ESLint config (flat config with Prettier)
-- `@repo/ui` — Shared component library (Button component)
-- `@repo/database` — Supabase typed client and schema definitions
-- `@repo/core` — Logger (Pino), Redis rate limiter, BullMQ job queues, Cloudflare R2 presigned URLs, billing abstraction
+- `@repo/ui`: Shared component library (Button component)
+- `@repo/database`: Supabase typed client and schema definitions
+- `@repo/core`: Logger (Pino), Redis rate limiter, BullMQ job queues, Cloudflare R2 presigned URLs, billing abstraction
 
-### ✅ Phase 2 — Homepage & Marketing (Complete)
+### ✅ Phase 2: Homepage & Marketing (Complete)
 - Responsive landing page with 8 sections:
   - Sticky navbar with glass-blur effect
-  - Hero section with gradient text and before/after visual
-  - Social proof / trusted by section
-  - Use cases grid (E-Commerce, Headshots, Social Media, Marketing)
+  - Hero section with before/after visual
+  - Scrolling logo cloud (Trusted By)
+  - Interactive tabbed Use Cases section
   - How it works (3-step flow)
-  - Testimonials with quote cards
-  - CTA section
+  - Vibrant testimonial cards (amber, sky, magenta)
+  - CTA section with dual buttons
   - Multi-column footer with social links
 - SEO metadata via `generateMetadata` API
 - OpenGraph and Twitter card meta tags
@@ -196,19 +196,19 @@ Works with **Coolify**, **Railway**, or any Docker-compatible platform.
 
 ## 🗺️ Roadmap
 
-### Phase 3 — Core Tool Interface
+### Phase 3: Core Tool Interface
 - [ ] Drag-and-drop file upload component with progress indicator
 - [ ] Direct client-to-R2 uploads via presigned URLs
 - [ ] BullMQ worker for background processing
 - [ ] SSE / polling for real-time job status updates
 - [ ] Result preview and download interface
 
-### Phase 4 — Authentication & User Dashboard
+### Phase 4: Authentication & User Dashboard
 - [ ] Supabase Auth integration (email, Google OAuth)
 - [ ] User profile and usage history
 - [ ] Credits system with free tier
 
-### Phase 5 — SEO Automation
+### Phase 5: SEO Automation
 - [ ] Dynamic `sitemap.xml` generation
 - [ ] Auto-generated `robots.txt`
 - [ ] `llms.txt` for AI crawler guidance
@@ -216,12 +216,12 @@ Works with **Coolify**, **Railway**, or any Docker-compatible platform.
 - [ ] Blog system with `next-mdx-remote`
 - [ ] i18n with `next-intl`
 
-### Phase 6 — Billing & Monetization
+### Phase 6: Billing & Monetization
 - [ ] Stripe integration via abstract payment provider
 - [ ] Subscription plans and checkout flows
 - [ ] Ad placement slots (AdSense, Carbon Ads)
 
-### Phase 7 — Deployment & DevOps
+### Phase 7: Deployment & DevOps
 - [ ] `netlify.toml` configuration
 - [ ] Vercel deployment config
 - [ ] CI/CD pipeline (GitHub Actions)
@@ -234,22 +234,22 @@ Works with **Coolify**, **Railway**, or any Docker-compatible platform.
 This boilerplate is designed to launch multiple tool websites. To create a new tool:
 
 1. **Fork or clone** this repository
-2. **Update `config/site.ts`** — change name, domain, SEO keywords
-3. **Update `config/tool.ts`** — set accepted file types, rate limits, processing config
-4. **Update page content** — modify the marketing components in `src/features/marketing/`
-5. **Add processing logic** — implement your tool's AI processing in `src/features/tool/`
+2. **Update `config/site.ts`**: change name, domain, SEO keywords
+3. **Update `config/tool.ts`**: set accepted file types, rate limits, processing config
+4. **Update page content**: modify the marketing components in `src/features/marketing/`
+5. **Add processing logic**: implement your tool's AI processing in `src/features/tool/`
 
 Example tools you can build:
-- `VideoWatermarks.com` — Video watermark remover
-- `GenerateFace.com` — AI face generator
-- `SubtitlesVideo.com` — Video subtitle extractor
-- `CompareFaces.com` — Face comparison tool
+- `VideoWatermarks.com`: Video watermark remover
+- `GenerateFace.com`: AI face generator
+- `SubtitlesVideo.com`: Video subtitle extractor
+- `CompareFaces.com`: Face comparison tool
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 

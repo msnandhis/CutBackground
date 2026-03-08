@@ -3,7 +3,7 @@ import { siteConfig } from "@config/site";
 
 export function Footer() {
     return (
-        <footer className="border-t border-neutral-800 bg-brand-dark px-4 py-16">
+        <footer className="bg-black px-4 py-16">
             <div className="mx-auto max-w-7xl">
                 <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-5">
                     {/* Brand column */}
@@ -18,21 +18,21 @@ export function Footer() {
                                 {siteConfig.name}
                             </span>
                         </Link>
-                        <p className="mt-4 max-w-xs text-sm leading-relaxed text-neutral-400">
+                        <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
                             AI-powered background removal for creators, designers, and e-commerce sellers. Fast, free, and professional quality.
                         </p>
-                        <div className="mt-6 flex gap-4">
+                        {/* Social icons */}
+                        <div className="mt-6 flex gap-3">
                             {[
-                                { label: "Tw", href: "https://twitter.com/cutbackground" },
-                                { label: "Gh", href: "https://github.com/cutbackground" },
-                                { label: "Li", href: "https://linkedin.com/company/cutbackground" },
+                                { label: "X", href: "#" },
+                                { label: "Fb", href: "#" },
+                                { label: "In", href: "#" },
+                                { label: "Li", href: "#" },
                             ].map((s) => (
                                 <a
                                     key={s.label}
                                     href={s.href}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700 text-xs font-semibold uppercase text-neutral-400 transition-all hover:border-brand-magenta hover:text-brand-magenta"
+                                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white/60 transition-all hover:bg-white/20 hover:text-white"
                                 >
                                     {s.label}
                                 </a>
@@ -40,43 +40,48 @@ export function Footer() {
                         </div>
                     </div>
 
-                    {/* Link columns */}
+                    {/* Company */}
                     <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-300">Product</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">Company</h3>
                         <ul className="mt-4 space-y-3">
-                            <li><Link href="#tool" className="text-sm text-neutral-400 transition-colors hover:text-white">Background Remover</Link></li>
-                            <li><Link href="#how-it-works" className="text-sm text-neutral-400 transition-colors hover:text-white">How It Works</Link></li>
-                            <li><Link href="#use-cases" className="text-sm text-neutral-400 transition-colors hover:text-white">Use Cases</Link></li>
-                            <li><Link href="/pricing" className="text-sm text-neutral-400 transition-colors hover:text-white">Pricing</Link></li>
+                            <li><Link href="/about" className="text-sm text-white/60 transition-colors hover:text-white">About Us</Link></li>
+                            <li><Link href="/contact" className="text-sm text-white/60 transition-colors hover:text-white">Contact</Link></li>
+                            <li><Link href="/careers" className="text-sm text-white/60 transition-colors hover:text-white">Careers</Link></li>
+                            <li><Link href="/blog" className="text-sm text-white/60 transition-colors hover:text-white">Blog</Link></li>
                         </ul>
                     </div>
+
+                    {/* Product */}
                     <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-300">Company</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">Product</h3>
                         <ul className="mt-4 space-y-3">
-                            <li><Link href="/about" className="text-sm text-neutral-400 transition-colors hover:text-white">About Us</Link></li>
-                            <li><Link href="/blog" className="text-sm text-neutral-400 transition-colors hover:text-white">Blog</Link></li>
-                            <li><Link href="/careers" className="text-sm text-neutral-400 transition-colors hover:text-white">Careers</Link></li>
+                            <li><Link href="#tool" className="text-sm text-white/60 transition-colors hover:text-white">Background Remover</Link></li>
+                            <li><Link href="#how-it-works" className="text-sm text-white/60 transition-colors hover:text-white">How It Works</Link></li>
+                            <li><Link href="#use-cases" className="text-sm text-white/60 transition-colors hover:text-white">Use Cases</Link></li>
+                            <li><Link href="/pricing" className="text-sm text-white/60 transition-colors hover:text-white">Pricing</Link></li>
                         </ul>
                     </div>
+
+                    {/* Resources */}
                     <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-neutral-300">Resources</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">Resources</h3>
                         <ul className="mt-4 space-y-3">
-                            <li><Link href="/docs" className="text-sm text-neutral-400 transition-colors hover:text-white">Documentation</Link></li>
-                            <li><Link href="/api" className="text-sm text-neutral-400 transition-colors hover:text-white">API Reference</Link></li>
-                            <li><Link href="/support" className="text-sm text-neutral-400 transition-colors hover:text-white">Support</Link></li>
+                            <li><Link href="/docs" className="text-sm text-white/60 transition-colors hover:text-white">Documentation</Link></li>
+                            <li><Link href="/api" className="text-sm text-white/60 transition-colors hover:text-white">API Reference</Link></li>
+                            <li><Link href="/support" className="text-sm text-white/60 transition-colors hover:text-white">Support</Link></li>
                         </ul>
                     </div>
                 </div>
 
                 {/* Bottom bar */}
-                <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-neutral-800 pt-8 sm:flex-row">
-                    <p className="text-xs text-neutral-500">
+                <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
+                    <p className="text-xs text-white/40">
                         &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
                     </p>
-                    <div className="flex gap-6 text-xs text-neutral-500">
-                        <Link href="/privacy" className="hover:text-neutral-300">Privacy</Link>
-                        <Link href="/terms" className="hover:text-neutral-300">Terms</Link>
-                        <Link href="/cookies" className="hover:text-neutral-300">Cookies</Link>
+                    <div className="flex gap-6 text-xs text-white/40">
+                        <Link href="/privacy" className="transition-colors hover:text-white/70">Privacy</Link>
+                        <Link href="/terms" className="transition-colors hover:text-white/70">Terms</Link>
+                        <Link href="/cookies" className="transition-colors hover:text-white/70">Cookies</Link>
                     </div>
                 </div>
             </div>
