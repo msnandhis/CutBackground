@@ -180,7 +180,7 @@ export { usageLogs } from "./usage-logs"
 | outputUrl | text | R2 URL of processed result |
 | status | text | "pending", "processing", "succeeded", "failed", "canceled" |
 | provider | text | "replicate", "fal", etc. |
-| providerPredictionId | text | External prediction ID |
+| providerJobId | text | External provider job ID |
 | modelUsed | text | Model identifier used |
 | errorMessage | text | Error details if failed |
 | metadata | jsonb | Additional data (file size, processing time, etc.) |
@@ -228,9 +228,9 @@ All AI model calls go through an abstract `AIProvider` interface:
 
 interface AIProvider {
   name: string
-  createPrediction(params: PredictionInput): Promise<PredictionResult>
-  getPredictionStatus(id: string): Promise<PredictionStatus>
-  cancelPrediction(id: string): Promise<void>
+  createJob(params: AIJobInput): Promise<AIJobResult>
+  getJobStatus(id: string): Promise<AIJobStatus>
+  cancelJob(id: string): Promise<void>
   supportsWebhook: boolean
 }
 ```

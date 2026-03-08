@@ -23,7 +23,7 @@
 
 ### 3.2 Define Schema
 - `packages/database/src/schema/auth.ts`: BetterAuth auto-managed tables (user, session, verification, account)
-- `packages/database/src/schema/jobs.ts`: jobs table (id, userId, idempotencyKey, inputType, inputUrl, outputUrl, status, provider, providerPredictionId, modelUsed, errorMessage, metadata, ipAddress, fingerprint, createdAt, completedAt)
+- `packages/database/src/schema/jobs.ts`: jobs table (id, userId, idempotencyKey, inputType, inputUrl, outputUrl, status, provider, providerJobId, modelUsed, errorMessage, metadata, ipAddress, fingerprint, createdAt, completedAt)
 - `packages/database/src/schema/addon-jobs.ts`: addon_jobs table (id, parentJobId, addonType, inputUrl, outputUrl, status, params, createdAt)
 - `packages/database/src/schema/usage-logs.ts`: usage_logs table (id, userId, ipAddress, fingerprint, toolName, action, metadata, createdAt)
 - `packages/database/src/schema/index.ts`: barrel export
@@ -93,7 +93,7 @@
 ## Phase 5: AI Provider System
 
 ### 5.1 Provider Interface & Types
-- Create `packages/core/src/ai-provider/types.ts`: AIProvider, PredictionInput, PredictionResult
+- Create `packages/core/src/ai-provider/types.ts`: AIProvider, AIJobInput, AIJobResult
 - Create `packages/core/src/ai-provider/registry.ts`: provider registry with fallback chain
 - Idempotency key: hash(fileUrl + fingerprint + timestamp)
 
@@ -101,7 +101,7 @@
 - Install `replicate` npm package
 - Create `packages/core/src/ai-provider/replicate.ts`: implements AIProvider
 - Webhook URL injection on prediction creation
-- Map Replicate responses to generic PredictionResult
+- Map Replicate responses to generic AIJobResult
 
 ### 5.3 Future Provider Stubs
 - `packages/core/src/ai-provider/fal.ts`: stub for fal.ai
