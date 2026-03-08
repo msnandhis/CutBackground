@@ -166,6 +166,7 @@ BetterAuth auto-manages its own tables (`user`, `session`, `verification`, `acco
 export { jobs } from "./jobs"
 export { addonJobs } from "./addon-jobs"
 export { usageLogs } from "./usage-logs"
+export { apiKeys } from "./api-keys"
 ```
 
 ### `jobs` Table
@@ -214,6 +215,49 @@ export { usageLogs } from "./usage-logs"
 | action | text | "upload", "process", "addon", "download" |
 | metadata | jsonb | Additional context |
 | createdAt | timestamptz | Log time |
+
+### `api_keys` Table
+
+| Column | Type | Description |
+|---|---|---|
+| id | uuid | Primary key |
+| userId | text | FK to user.id |
+| name | text | e.g., "Production Key" |
+| hashedKey | text | SHA-256 hash of the key (never store raw) |
+| keyPrefix | text | e.g., "cut_live_" (first 9 chars for UI display) |
+| lastUsedAt | timestamptz (nullable) | Last API call time |
+| createdAt | timestamptz | Creation time |
+
+---
+
+## Developer API & Unified Billing
+
+### The Credit System
+To support both B2C (Web UI) and B2B (Developer API) users seamlessly, the application uses a **Unified Credit System**:
+- 1 Credit = 1 Successful Image Processed
+- Web users (logged in via BetterAuth session) deduct from their credit balance.
+- API users (authenticated via Bearer token) deduct from the *same* credit balance.
+
+### API Authentication Middleware
+The Next.js middleware protects `/api/v1/*` routes dynamically:
+1. Checks for `Authorization: Bearer <token>` header.
+2. Hashes the incoming token (SHA-256) and looks it up in the `api_keys` table.
+3. Attaches the `userId` to the request context.
+4. If no token, falls back to checking for a valid BetterAuth session cookie.
+
+### Example Developer Endpoint
+
+```http
+POST /api/v1/jobs
+Authorization: Bearer cut_live_xxxxxxxxxxxxxxxx
+Content-Type: application/json
+
+{
+  "imageUrl": "https://example.com/photo.jpg",
+  "webhookUrl": "https://their-server.com/webhook",
+  "addons": ["upscale", "shadow"]
+}
+```
 
 ---
 

@@ -58,9 +58,13 @@
 ### 4.4 Auth Middleware
 - Create `apps/web/middleware.ts`:
   - Protect routes: `/dashboard`, `/settings`, `/api/jobs`
-  - Validate session via `auth.api.getSession({ headers })`
+  - Unified Auth Check: 
+    - Check for `Authorization: Bearer <token>` (Developer API). If present, validate hash against `api_keys` table.
+    - Fallback: Validate BetterAuth session via `auth.api.getSession({ headers })`
   - Redirect unauthenticated users to `/login`
-  - Apply Redis rate limiting to all API routes
+  - Apply Redis rate limiting: 
+    - Higher limits for Bearer tokens based on credit balance
+    - Standard limits for web sessions
 
 ### 4.5 Auth Pages
 - `apps/web/src/app/(auth)/login/page.tsx`: email/password + magic link option
@@ -69,12 +73,13 @@
 - `apps/web/src/app/(auth)/reset-password/page.tsx`: set new password (via token from email)
 - `apps/web/src/app/(auth)/verify-email/page.tsx`: email verification confirmation
 
-### 4.6 Auth Feature Components
+### 4.6 Auth & Dashboard Feature Components
 - `features/auth/components/login-form.tsx`: email + password fields, "Forgot password?" link, "Sign in with magic link" toggle
 - `features/auth/components/signup-form.tsx`: email + password + confirm password, Zod validation
 - `features/auth/components/forgot-password-form.tsx`: email input, submit sends reset link
 - `features/auth/components/reset-password-form.tsx`: new password + confirm, validates token from URL
 - `features/auth/components/magic-link-form.tsx`: email input, submit sends magic link
+- **[NEW]** `features/admin/components/api-keys-manager.tsx`: UI to generate, view (once), and revoke API keys in the dashboard.
 
 ### 4.7 Email Service
 - Install `resend` (or `nodemailer` for self-hosted SMTP)
@@ -120,9 +125,15 @@
 
 ### 6.4 Replicate Webhook
 - `apps/web/src/app/api/webhooks/replicate/route.ts`: verify HMAC, update job, download output to R2
+- If job was triggered via Developer API with a custom `webhookUrl` in the payload, forward the completion event to the user's webhook.
 
 ### 6.5 Job Status API
 - `apps/web/src/app/api/jobs/status/[id]/route.ts`: return job status and output URL
+
+### 6.6 Developer API (REST)
+- Create `/api/v1/jobs` ecosystem for developers authenticated via Bearer token
+- Unified credit billing deducted directly upon successful API response
+- Custom webhook delivery payload logic
 
 ## Phase 7: Add-On Features
 
