@@ -144,8 +144,8 @@ cd CutBackground
 # Install all dependencies
 pnpm install
 
-# Copy environment variables
-cp .env.example .env.local
+# Copy the local development environment template
+cp .env.local.example .env.local
 ```
 
 ### Configure Environment
@@ -163,7 +163,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/cutbackground
 # Replicate
 REPLICATE_API_TOKEN=r8_your_token
 
-# Cloudflare R2
+# Optional Cloudflare R2 / MinIO
 R2_ENDPOINT=https://your-account.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=your-key
 R2_SECRET_ACCESS_KEY=your-secret
@@ -177,24 +177,34 @@ RESEND_API_KEY=re_your_key
 EMAIL_FROM=noreply@cutbackground.com
 ```
 
+### Local Infrastructure
+
+```bash
+# PostgreSQL + Redis
+pnpm infra:up
+
+# Optional MinIO for S3-compatible local object storage
+pnpm infra:up:storage
+```
+
+If Docker is not available on your machine, you can point `.env.local` at an already running local PostgreSQL / Redis instance instead.
+The checked-in Compose stack uses host ports `15432` for PostgreSQL and `16379` for Redis so it can coexist with native local services and Docker Desktop port reservations.
+
 ### Database Setup
 
 ```bash
-# Run Drizzle migrations
-pnpm --filter=@repo/database db:migrate
-
-# Generate BetterAuth tables
-npx @better-auth/cli migrate
+# Run the checked-in Drizzle migration against .env.local
+pnpm db:migrate:local
 ```
 
 ### Run Development Server
 
 ```bash
-# Start with Turbopack
+# Start the validated web runtime
 pnpm dev --filter=@repo/web
 
-# Or run all apps
-pnpm dev
+# Start the validated worker runtime
+pnpm --filter=@repo/core worker:tool
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.

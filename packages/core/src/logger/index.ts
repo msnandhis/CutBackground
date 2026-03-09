@@ -1,4 +1,7 @@
 import pino from "pino";
+import { getSiteIdentity } from "../env";
+
+const siteIdentity = getSiteIdentity();
 
 export const logger = pino({
     level: process.env.NODE_ENV === "production" ? "info" : "debug",
@@ -9,8 +12,8 @@ export const logger = pino({
     },
     timestamp: pino.stdTimeFunctions.isoTime,
     base: {
-        domain: process.env.NEXT_PUBLIC_SITE_DOMAIN || "unknown",
-        tool: process.env.NEXT_PUBLIC_TOOL_NAME || "unknown",
+        domain: siteIdentity.domain,
+        tool: siteIdentity.toolName,
     },
 });
 

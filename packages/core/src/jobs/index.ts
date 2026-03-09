@@ -1,19 +1,44 @@
 import { Queue, Worker, type ConnectionOptions } from "bullmq";
+import {
+    assertRuntimeRequirements,
+    getRedisConnectionOptions,
+    isBackgroundQueueEnabled,
+} from "../env";
 
-const redisUrl = new URL(process.env.REDIS_URL || "redis://localhost:6379");
+let toolQueue: Queue | null = null;
+let logQueue: Queue | null = null;
 
-const connection: ConnectionOptions = {
-    host: redisUrl.hostname,
-    port: Number(redisUrl.port || 6379),
-    username: redisUrl.username || undefined,
-    password: redisUrl.password || undefined,
-    db: redisUrl.pathname ? Number(redisUrl.pathname.slice(1) || 0) : 0,
-    maxRetriesPerRequest: null,
-};
+function getConnection() {
+    const connection = getRedisConnectionOptions();
+
+    if (!connection) {
+        throw new Error("Missing runtime configuration for redis: REDIS_URL");
+    }
+
+    return connection;
+}
+
+function getToolQueue() {
+    if (toolQueue) {
+        return toolQueue;
+    }
+
+    assertRuntimeRequirements("redis");
+    toolQueue = new Queue("tool-processing", { connection: getConnection() });
+    return toolQueue;
+}
+
+function getLogQueue() {
+    if (logQueue) {
+        return logQueue;
+    }
+
+    assertRuntimeRequirements("redis");
+    logQueue = new Queue("log-batching", { connection: getConnection() });
+    return logQueue;
+}
 
 // ── Tool Processing Queue ──────────────────────────────────
-export const toolQueue = new Queue("tool-processing", { connection });
-
 export interface ToolJobData {
     jobId: string;
     inputUrl: string;
@@ -26,7 +51,12 @@ export interface ToolJobData {
  * Called from the `/api/tool/start` route.
  */
 export async function enqueueToolJob(data: ToolJobData) {
-    return toolQueue.add("process", data, {
+    if (!isBackgroundQueueEnabled()) {
+        throw new Error("Background queue is disabled for this environment.");
+    }
+
+    return getToolQueue().add("process", data, {
+        jobId: data.jobId,
         attempts: 3,
         backoff: { type: "exponential", delay: 2000 },
         removeOnComplete: 100,
@@ -34,9 +64,29 @@ export async function enqueueToolJob(data: ToolJobData) {
     });
 }
 
-// ── Log Batching Queue ─────────────────────────────────────
-export const logQueue = new Queue("log-batching", { connection });
+export async function cancelQueuedToolJob(jobId: string) {
+    const queuedJob = await getToolQueue().getJob(jobId);
 
+    if (!queuedJob) {
+        return false;
+    }
+
+    const state = await queuedJob.getState();
+
+    if (
+        state === "waiting" ||
+        state === "delayed" ||
+        state === "prioritized" ||
+        state === "waiting-children"
+    ) {
+        await queuedJob.remove();
+        return true;
+    }
+
+    return false;
+}
+
+// ── Log Batching Queue ─────────────────────────────────────
 export interface LogEntry {
     level: string;
     message: string;
@@ -56,10 +106,16 @@ export interface LogEntry {
  * A scheduled worker can flush these to the configured database or log sink.
  */
 export async function pushLogEntry(entry: LogEntry) {
-    return logQueue.add("log", entry, {
+    return getLogQueue().add("log", entry, {
         removeOnComplete: true,
         removeOnFail: 500,
     });
 }
 
-export { Queue, Worker, connection };
+export function getQueueConnection(): ConnectionOptions {
+    assertRuntimeRequirements("redis");
+    return getConnection();
+}
+
+export { Queue, Worker };
+export { processToolJobExecution } from "./process-tool-job";

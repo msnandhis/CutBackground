@@ -14,6 +14,7 @@ export const routes = {
     verifyEmail: "/verify-email",
     dashboard: "/dashboard",
     dashboardJobs: "/dashboard/jobs",
+    dashboardJob: (jobId: string) => `/dashboard/jobs/${jobId}`,
     dashboardApiKeys: "/dashboard/api-keys",
     dashboardSettings: "/dashboard/settings",
     privacy: "/privacy",

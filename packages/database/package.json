@@ -7,6 +7,8 @@
     "scripts": {
         "build": "tsc -p tsconfig.json",
         "db:generate": "drizzle-kit generate",
+        "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+        "db:migrate:local": "node scripts/migrate-local.mjs",
         "clean": "rm -rf dist node_modules"
     },
     "dependencies": {

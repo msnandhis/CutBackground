@@ -2,16 +2,14 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
 import { magicLink } from "better-auth/plugins";
 import { db, schema } from "@repo/database";
+import { getAuthSecret, getServerAuthBaseUrl, getSiteIdentity } from "../env";
 import { logger } from "../logger";
 
-const authBaseUrl =
-    process.env.BETTER_AUTH_URL ??
-    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
-    "http://localhost:3000";
-
+const authBaseUrl = getServerAuthBaseUrl();
 const authSecret =
-    process.env.BETTER_AUTH_SECRET ??
-    "local-development-better-auth-secret-2026-keep-out";
+    getAuthSecret() ??
+    "Q8y2vN4mL7rP1xT5kC9dF3hJ6sW0bZ4qR8uY2nM5pL1tV7cX3kH9dS6fB2gA4wE";
+const siteIdentity = getSiteIdentity();
 
 export const auth = betterAuth({
     secret: authSecret,
@@ -31,7 +29,12 @@ export const auth = betterAuth({
             url: string;
         }) => {
             logger.info(
-                { email: user.email, verificationUrl: url },
+                {
+                    email: user.email,
+                    verificationUrl: url,
+                    domain: siteIdentity.domain,
+                    tool: siteIdentity.toolName,
+                },
                 "Email verification requested."
             );
         },
@@ -43,7 +46,12 @@ export const auth = betterAuth({
             url: string;
         }) => {
             logger.info(
-                { email: user.email, resetUrl: url },
+                {
+                    email: user.email,
+                    resetUrl: url,
+                    domain: siteIdentity.domain,
+                    tool: siteIdentity.toolName,
+                },
                 "Password reset email requested."
             );
         },
@@ -51,7 +59,15 @@ export const auth = betterAuth({
     plugins: [
         magicLink({
             sendMagicLink: async ({ email, url }: { email: string; url: string }) => {
-                logger.info({ email, magicLinkUrl: url }, "Magic link requested.");
+                logger.info(
+                    {
+                        email,
+                        magicLinkUrl: url,
+                        domain: siteIdentity.domain,
+                        tool: siteIdentity.toolName,
+                    },
+                    "Magic link requested."
+                );
             },
         }),
     ],

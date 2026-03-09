@@ -1,14 +1,11 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { getDatabaseUrl } from "./env";
 import * as schema from "./schema";
 
 export function createClient() {
-    const databaseUrl =
-        process.env.DATABASE_URL ??
-        "postgresql://postgres:postgres@127.0.0.1:5432/cutbackground";
-
     const pool = new Pool({
-        connectionString: databaseUrl,
+        connectionString: getDatabaseUrl(),
     });
 
     return drizzle(pool, { schema });

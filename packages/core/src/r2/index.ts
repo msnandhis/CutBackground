@@ -4,17 +4,53 @@ import {
     GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { assertRuntimeRequirements, getR2Config } from "../env";
 
-const r2Client = new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT || "",
-    credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
-    },
-});
+let r2Client: S3Client | null = null;
 
-const BUCKET = process.env.R2_BUCKET_NAME || "tool-uploads";
+export function getR2Client() {
+    if (r2Client) {
+        return r2Client;
+    }
+
+    assertRuntimeRequirements("r2");
+    const config = getR2Config()!;
+
+    r2Client = new S3Client({
+        region: "auto",
+        endpoint: config.endpoint,
+        credentials: {
+            accessKeyId: config.accessKeyId,
+            secretAccessKey: config.secretAccessKey,
+        },
+    });
+
+    return r2Client;
+}
+
+export function getR2BucketName() {
+    return getR2Config()?.bucketName ?? "tool-uploads";
+}
+
+/**
+ * Upload an object to R2 from the server runtime.
+ */
+export async function uploadObject(params: {
+    key: string;
+    body: Buffer | Uint8Array | string;
+    contentType: string;
+}) {
+    assertRuntimeRequirements("r2");
+
+    const command = new PutObjectCommand({
+        Bucket: getR2BucketName(),
+        Key: params.key,
+        Body: params.body,
+        ContentType: params.contentType,
+    });
+
+    return getR2Client().send(command);
+}
 
 /**
  * Generate a presigned URL for direct client-side uploads to R2.
@@ -24,13 +60,15 @@ export async function getPresignedUploadUrl(
     contentType: string,
     expiresIn = 600
 ): Promise<string> {
+    assertRuntimeRequirements("r2");
+
     const command = new PutObjectCommand({
-        Bucket: BUCKET,
+        Bucket: getR2BucketName(),
         Key: key,
         ContentType: contentType,
     });
 
-    return getSignedUrl(r2Client, command, { expiresIn });
+    return getSignedUrl(getR2Client(), command, { expiresIn });
 }
 
 /**
@@ -40,12 +78,14 @@ export async function getPresignedDownloadUrl(
     key: string,
     expiresIn = 3600
 ): Promise<string> {
+    assertRuntimeRequirements("r2");
+
     const command = new GetObjectCommand({
-        Bucket: BUCKET,
+        Bucket: getR2BucketName(),
         Key: key,
     });
 
-    return getSignedUrl(r2Client, command, { expiresIn });
+    return getSignedUrl(getR2Client(), command, { expiresIn });
 }
 
-export { r2Client, BUCKET };
+export { r2Client };

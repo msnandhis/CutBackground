@@ -3,7 +3,8 @@ export type JobStatus =
     | "uploading"
     | "processing"
     | "succeeded"
-    | "failed";
+    | "failed"
+    | "canceled";
 
 export interface MockJob {
     id: string;

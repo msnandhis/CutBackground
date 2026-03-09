@@ -6,6 +6,7 @@ const statusStyles: Record<JobStatus | "active" | "revoked", string> = {
     processing: "bg-amber-100 text-amber-700",
     succeeded: "bg-emerald-100 text-emerald-700",
     failed: "bg-rose-100 text-rose-700",
+    canceled: "bg-slate-200 text-slate-700",
     active: "bg-emerald-100 text-emerald-700",
     revoked: "bg-neutral-200 text-neutral-600",
 };

@@ -1,5 +1,18 @@
 // @repo/core - Core Utilities
 export { auth } from "./auth/auth";
 export { logger, createRequestLogger } from "./logger";
-export { redis } from "./redis";
+export { getRedisClient } from "./redis";
 export { getPresignedUploadUrl, getPresignedDownloadUrl } from "./r2";
+export { cancelBackgroundRemoval, runBackgroundRemoval } from "./ai-provider/replicate";
+export { isLocalToolAsset, readToolAsset, storeToolAsset } from "./storage";
+export {
+    assertRuntimeRequirements,
+    getProductionReadinessSummary,
+    getRuntimeDependencyStatuses,
+    isAuthConfigured,
+    isBackgroundQueueConfigured,
+    isDatabaseConfigured,
+    isR2Configured,
+    isRedisConfigured,
+    isReplicateConfigured,
+} from "./env";
