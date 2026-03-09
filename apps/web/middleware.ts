@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { auth } from "@repo/core/auth";
+import { getSessionCookie } from "better-auth/cookies";
 
 const protectedPrefixes = ["/dashboard"];
 
@@ -11,9 +11,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    const session = await auth.api.getSession({
-        headers: request.headers,
-    });
+    const session = getSessionCookie(request.headers);
 
     if (!session) {
         const loginUrl = new URL("/login", request.url);

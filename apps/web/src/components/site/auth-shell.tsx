@@ -30,10 +30,11 @@ export function AuthShell({
                             {description}
                         </p>
                         <div className="mt-8 rounded-3xl border border-neutral-200 bg-white/70 p-6 shadow-sm">
-                            <p className="text-sm font-semibold text-brand-dark">Frontend-first scaffold</p>
+                            <p className="text-sm font-semibold text-brand-dark">Production-shaped auth UX</p>
                             <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-                                These flows are mocked for now, but the UI states and form structure are
-                                shaped to map cleanly onto BetterAuth when backend wiring starts.
+                                These flows now talk to the auth client directly, with loading, success,
+                                and failure states designed to survive the backend rollout without a UI
+                                rewrite.
                             </p>
                         </div>
                     </div>

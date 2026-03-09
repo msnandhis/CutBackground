@@ -23,7 +23,25 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
         requireEmailVerification: true,
-        sendResetPassword: async ({ user, url }) => {
+        sendVerificationEmail: async ({
+            user,
+            url,
+        }: {
+            user: { email: string };
+            url: string;
+        }) => {
+            logger.info(
+                { email: user.email, verificationUrl: url },
+                "Email verification requested."
+            );
+        },
+        sendResetPassword: async ({
+            user,
+            url,
+        }: {
+            user: { email: string };
+            url: string;
+        }) => {
             logger.info(
                 { email: user.email, resetUrl: url },
                 "Password reset email requested."
@@ -32,7 +50,7 @@ export const auth = betterAuth({
     },
     plugins: [
         magicLink({
-            sendMagicLink: async ({ email, url }) => {
+            sendMagicLink: async ({ email, url }: { email: string; url: string }) => {
                 logger.info({ email, magicLinkUrl: url }, "Magic link requested.");
             },
         }),

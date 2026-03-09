@@ -1,20 +1,29 @@
+import { AuthFeedback } from "@/features/auth/components/auth-feedback";
 import Link from "next/link";
 import { Button } from "@repo/ui";
 import { AuthShell } from "@/components/site/auth-shell";
 import { routes } from "@/lib/routes";
 
-export default function VerifyEmailPage() {
+export default async function VerifyEmailPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ email?: string }>;
+}) {
+    const { email } = await searchParams;
+
     return (
         <AuthShell
             title="Verify your email"
-            description="Email verification is mocked for now, but this page already exists as the final confirmation and resend destination for the auth flow."
+            description="Email verification is the final gate before the workspace opens. This page handles the waiting state and resend destination."
         >
             <div className="space-y-5">
-                <div className="rounded-2xl bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
-                    Verification link sent to team@cutbackground.com
-                </div>
+                <AuthFeedback
+                    tone="success"
+                    message={`Verification link sent${email ? ` to ${email}` : ""}.`}
+                />
                 <p className="text-sm leading-relaxed text-neutral-600">
-                    In production this page will handle success, expired token, and resend states.
+                    Open the message from your inbox and use the verification link to complete setup. If
+                    the link expires, request a new one from the sign-in flow.
                 </p>
                 <Link href={routes.login}>
                     <Button className="w-full">Return to sign in</Button>

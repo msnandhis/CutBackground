@@ -5,7 +5,7 @@ export default function ForgotPasswordPage() {
     return (
         <AuthShell
             title="Reset your password"
-            description="The request state, success state, and supporting content are already modeled here so backend token flows later remain a wiring task."
+            description="Request a reset link and move into the token-based reset flow without changing the page structure later."
         >
             <ForgotPasswordForm />
         </AuthShell>

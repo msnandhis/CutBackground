@@ -1,5 +1,10 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useTransition } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { authClient } from "@repo/core/auth/client";
 import { dashboardNav, routes } from "@/lib/routes";
 import { siteConfig } from "@config/site";
 
@@ -12,6 +17,13 @@ export function DashboardShell({
     description: string;
     children: ReactNode;
 }) {
+    const pathname = usePathname();
+    const router = useRouter();
+    const { data: sessionData, isPending: isSessionPending } = authClient.useSession();
+    const [isSigningOut, startTransition] = useTransition();
+
+    const user = sessionData?.user;
+
     return (
         <div className="min-h-screen bg-neutral-50">
             <header className="border-b border-neutral-200 bg-white">
@@ -20,7 +32,13 @@ export function DashboardShell({
                         <Link href={routes.home} className="text-lg font-bold text-brand-dark">
                             {siteConfig.name}
                         </Link>
-                        <p className="text-sm text-neutral-500">Mocked app workspace ready for backend wiring</p>
+                        <p className="text-sm text-neutral-500">
+                            {isSessionPending
+                                ? "Loading workspace session..."
+                                : user
+                                  ? `Signed in as ${user.email}`
+                                  : "Workspace session unavailable"}
+                        </p>
                     </div>
                     <div className="flex items-center gap-3">
                         <Link
@@ -29,12 +47,20 @@ export function DashboardShell({
                         >
                             Open tool
                         </Link>
-                        <Link
-                            href={routes.login}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                startTransition(async () => {
+                                    await authClient.signOut();
+                                    router.push(routes.login);
+                                    router.refresh();
+                                });
+                            }}
                             className="rounded-full bg-brand-dark px-4 py-2 text-sm font-semibold text-white"
+                            disabled={isSigningOut}
                         >
-                            Switch account
-                        </Link>
+                            {isSigningOut ? "Signing out..." : "Sign out"}
+                        </button>
                     </div>
                 </div>
             </header>
@@ -48,7 +74,11 @@ export function DashboardShell({
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className="block rounded-2xl px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                                className={`block rounded-2xl px-3 py-2 text-sm font-medium transition-colors ${
+                                    pathname === item.href
+                                        ? "bg-neutral-900 text-white"
+                                        : "text-neutral-700 hover:bg-neutral-100"
+                                }`}
                             >
                                 {item.label}
                             </Link>
