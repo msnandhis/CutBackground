@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { footerColumns } from "@/lib/routes";
 import { siteConfig } from "@config/site";
 
 export function Footer() {
@@ -40,37 +41,25 @@ export function Footer() {
                         </div>
                     </div>
 
-                    {/* Company */}
-                    <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">Company</h3>
-                        <ul className="mt-4 space-y-3">
-                            <li><Link href="/about" className="text-sm text-white/60 transition-colors hover:text-white">About Us</Link></li>
-                            <li><Link href="/contact" className="text-sm text-white/60 transition-colors hover:text-white">Contact</Link></li>
-                            <li><Link href="/careers" className="text-sm text-white/60 transition-colors hover:text-white">Careers</Link></li>
-                            <li><Link href="/blog" className="text-sm text-white/60 transition-colors hover:text-white">Blog</Link></li>
-                        </ul>
-                    </div>
-
-                    {/* Product */}
-                    <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">Product</h3>
-                        <ul className="mt-4 space-y-3">
-                            <li><Link href="#tool" className="text-sm text-white/60 transition-colors hover:text-white">Background Remover</Link></li>
-                            <li><Link href="#how-it-works" className="text-sm text-white/60 transition-colors hover:text-white">How It Works</Link></li>
-                            <li><Link href="#use-cases" className="text-sm text-white/60 transition-colors hover:text-white">Use Cases</Link></li>
-                            <li><Link href="/pricing" className="text-sm text-white/60 transition-colors hover:text-white">Pricing</Link></li>
-                        </ul>
-                    </div>
-
-                    {/* Resources */}
-                    <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">Resources</h3>
-                        <ul className="mt-4 space-y-3">
-                            <li><Link href="/docs" className="text-sm text-white/60 transition-colors hover:text-white">Documentation</Link></li>
-                            <li><Link href="/api" className="text-sm text-white/60 transition-colors hover:text-white">API Reference</Link></li>
-                            <li><Link href="/support" className="text-sm text-white/60 transition-colors hover:text-white">Support</Link></li>
-                        </ul>
-                    </div>
+                    {footerColumns.map((column) => (
+                        <div key={column.title}>
+                            <h3 className="text-sm font-semibold uppercase tracking-wider text-white/80">
+                                {column.title}
+                            </h3>
+                            <ul className="mt-4 space-y-3">
+                                {column.links.map((link) => (
+                                    <li key={link.href}>
+                                        <Link
+                                            href={link.href}
+                                            className="text-sm text-white/60 transition-colors hover:text-white"
+                                        >
+                                            {link.label}
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
                 </div>
 
                 {/* Bottom bar */}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 import { toolConfig } from "@config/tool";
 
 export function ToolPreview() {
@@ -63,10 +64,10 @@ export function ToolPreview() {
                                 </div>
                             </div>
                             <Link
-                                href="#faq"
+                                href={routes.docs}
                                 className="mt-6 inline-flex rounded-full bg-brand-magenta px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-brand-magenta-hover"
                             >
-                                See current limitations
+                                See frontend roadmap
                             </Link>
                         </div>
                     </div>

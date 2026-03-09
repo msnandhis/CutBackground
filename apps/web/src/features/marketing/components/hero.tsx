@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { routes } from "@/lib/routes";
 
 export function Hero() {
     return (
@@ -19,7 +20,7 @@ export function Hero() {
                     </p>
                     <div className="mt-10">
                         <Link
-                            href="#tool"
+                            href={routes.tool}
                             className="inline-block rounded-full bg-brand-magenta px-8 py-4 text-base font-semibold text-white transition-all hover:bg-brand-magenta-hover hover:shadow-lg hover:shadow-brand-magenta/25"
                         >
                             Try for Free

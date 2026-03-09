@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { marketingPrimaryNav, routes } from "@/lib/routes";
 import { siteConfig } from "@config/site";
 
 export function Navbar() {
@@ -19,23 +20,23 @@ export function Navbar() {
 
                 {/* Nav */}
                 <nav className="hidden items-center gap-6 md:flex">
-                    <Link href="#how-it-works" className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-dark">
-                        How It Works
-                    </Link>
-                    <Link href="#use-cases" className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-dark">
-                        Use Cases
-                    </Link>
-                    <Link href="#faq" className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-dark">
-                        FAQ
-                    </Link>
+                    {marketingPrimaryNav.map((item) => (
+                        <Link
+                            key={item.href}
+                            href={item.href}
+                            className="text-sm font-medium text-neutral-600 transition-colors hover:text-brand-dark"
+                        >
+                            {item.label}
+                        </Link>
+                    ))}
                 </nav>
 
                 {/* CTA */}
                 <div className="flex items-center gap-3">
-                    <Link href="/login" className="hidden text-sm font-medium text-neutral-600 transition-colors hover:text-brand-dark sm:inline-block">
+                    <Link href={routes.login} className="hidden text-sm font-medium text-neutral-600 transition-colors hover:text-brand-dark sm:inline-block">
                         Login
                     </Link>
-                    <Link href="#tool" className="rounded-full bg-brand-magenta px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-brand-magenta-hover hover:shadow-lg">
+                    <Link href={routes.tool} className="rounded-full bg-brand-magenta px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-brand-magenta-hover hover:shadow-lg">
                         Try Free
                     </Link>
                 </div>
