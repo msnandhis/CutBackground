@@ -6,7 +6,7 @@
     "types": "./src/index.ts",
     "scripts": {
         "lint": "eslint .",
-        "build": "tsc --build",
+        "build": "tsc -p tsconfig.json",
         "clean": "rm -rf dist node_modules"
     },
     "devDependencies": {

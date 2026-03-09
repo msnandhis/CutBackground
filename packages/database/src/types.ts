@@ -1,3 +1,3 @@
-import type { createClient } from "./client";
+import type { DatabaseClient } from "./client";
 
-export type Database = ReturnType<typeof createClient>;
+export type Database = DatabaseClient;
