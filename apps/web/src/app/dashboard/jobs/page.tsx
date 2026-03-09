@@ -12,7 +12,7 @@ export default async function DashboardJobsPage() {
     return (
         <DashboardShell
             title="Job history"
-            description="Recorded job history for the authenticated workspace, ready for queue and webhook lifecycle wiring."
+            description="Recorded job history for the authenticated workspace, including queue execution and webhook-completed runs."
         >
             {data.jobs.length === 0 ? (
                 <div className="rounded-[2rem] border border-dashed border-neutral-300 bg-white p-10 text-center shadow-sm">

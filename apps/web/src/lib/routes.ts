@@ -16,6 +16,7 @@ export const routes = {
     dashboardJobs: "/dashboard/jobs",
     dashboardJob: (jobId: string) => `/dashboard/jobs/${jobId}`,
     dashboardApiKeys: "/dashboard/api-keys",
+    dashboardOperations: "/dashboard/operations",
     dashboardSettings: "/dashboard/settings",
     privacy: "/privacy",
     terms: "/terms",
@@ -33,6 +34,7 @@ export const dashboardNav = [
     { href: routes.dashboard, label: "Overview" },
     { href: routes.dashboardJobs, label: "Jobs" },
     { href: routes.dashboardApiKeys, label: "API Keys" },
+    { href: routes.dashboardOperations, label: "Operations" },
     { href: routes.dashboardSettings, label: "Settings" },
 ];
 

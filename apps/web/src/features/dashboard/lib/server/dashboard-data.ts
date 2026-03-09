@@ -4,11 +4,12 @@ import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
-import { apiKeys, db, jobs } from "@repo/database";
+import { apiKeys, db, jobs, users } from "@repo/database";
 import { getPresignedDownloadUrl } from "@repo/core/r2";
 import { isLocalToolAsset } from "@repo/core/storage";
 import { auth } from "@repo/core/auth/server";
-import { isAuthConfigured, isDatabaseConfigured } from "@repo/core/env";
+import { getStaleToolJobSummary, getToolQueueHealth } from "@repo/core/jobs";
+import { isAuthConfigured, isDatabaseConfigured, isOperatorEmail } from "@repo/core/env";
 import { routes } from "@/lib/routes";
 import type { JobStatus } from "@/lib/types";
 import type {
@@ -16,6 +17,8 @@ import type {
     DashboardData,
     DashboardJob,
     DashboardJobDetail,
+    OperatorDashboardData,
+    OperatorFailureItem,
     DashboardStat,
     DashboardViewer,
 } from "../types";
@@ -115,6 +118,16 @@ function toDashboardApiKey(row: typeof apiKeys.$inferSelect): DashboardApiKey {
         createdAtLabel: formatDate(row.createdAt),
         lastUsedAtLabel: row.lastUsedAt ? formatDate(row.lastUsedAt) : null,
         status: row.revokedAt ? "revoked" : "active",
+    };
+}
+
+function toOperatorFailureItem(row: typeof jobs.$inferSelect & { ownerEmail: string | null }): OperatorFailureItem {
+    return {
+        id: row.id,
+        status: row.status as JobStatus,
+        errorMessage: row.errorMessage,
+        createdAtLabel: formatDate(row.createdAt),
+        ownerEmail: row.ownerEmail,
     };
 }
 
@@ -242,4 +255,91 @@ export async function getDashboardJobDetail(jobId: string) {
     }
 
     return toDashboardJobDetail(row);
+}
+
+export async function getOperatorDashboardData(): Promise<OperatorDashboardData> {
+    if (!isDatabaseConfigured() || !isAuthConfigured()) {
+        redirect(`${routes.login}?redirectTo=${encodeURIComponent(routes.dashboardOperations)}`);
+    }
+
+    const requestHeaders = await headers();
+    let session = null;
+
+    try {
+        session = await auth.api.getSession({
+            headers: requestHeaders,
+        });
+    } catch {
+        redirect(`${routes.login}?redirectTo=${encodeURIComponent(routes.dashboardOperations)}`);
+    }
+
+    if (!session) {
+        redirect(`${routes.login}?redirectTo=${encodeURIComponent(routes.dashboardOperations)}`);
+    }
+
+    const viewer: DashboardViewer = {
+        id: session.user.id,
+        name: session.user.name || "Workspace user",
+        email: session.user.email,
+    };
+
+    const authorized = isOperatorEmail(viewer.email);
+
+    if (!authorized) {
+        return {
+            authorized: false,
+            viewer,
+            queue: {
+                configured: false,
+                waiting: 0,
+                active: 0,
+                completed: 0,
+                failed: 0,
+            },
+            staleJobs: {
+                staleCount: 0,
+                oldestStaleJobAgeSeconds: 0,
+                thresholdSeconds: 0,
+            },
+            recentFailures: [],
+        };
+    }
+
+    const [queue, staleJobs, failureRows] = await Promise.all([
+        getToolQueueHealth(),
+        getStaleToolJobSummary(),
+        db
+            .select({
+                id: jobs.id,
+                userId: jobs.userId,
+                idempotencyKey: jobs.idempotencyKey,
+                inputType: jobs.inputType,
+                inputUrl: jobs.inputUrl,
+                outputUrl: jobs.outputUrl,
+                status: jobs.status,
+                provider: jobs.provider,
+                providerJobId: jobs.providerJobId,
+                modelUsed: jobs.modelUsed,
+                errorMessage: jobs.errorMessage,
+                metadata: jobs.metadata,
+                ipAddress: jobs.ipAddress,
+                fingerprint: jobs.fingerprint,
+                createdAt: jobs.createdAt,
+                completedAt: jobs.completedAt,
+                ownerEmail: users.email,
+            })
+            .from(jobs)
+            .leftJoin(users, eq(users.id, jobs.userId))
+            .where(eq(jobs.status, "failed"))
+            .orderBy(desc(jobs.createdAt))
+            .limit(8),
+    ]);
+
+    return {
+        authorized: true,
+        viewer,
+        queue,
+        staleJobs,
+        recentFailures: failureRows.map(toOperatorFailureItem),
+    };
 }

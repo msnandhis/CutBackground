@@ -1,8 +1,12 @@
-const localDevelopmentDatabaseUrl =
-    "postgresql://postgres:postgres@127.0.0.1:5432/cutbackground";
+const placeholderDatabaseUrl =
+    "postgresql://placeholder:placeholder@127.0.0.1:9/placeholder";
 
 export function getDatabaseUrl() {
-    return process.env.DATABASE_URL ?? localDevelopmentDatabaseUrl;
+    if (process.env.DATABASE_URL) {
+        return process.env.DATABASE_URL;
+    }
+
+    return placeholderDatabaseUrl;
 }
 
 export function isUsingLocalDevelopmentDatabaseFallback() {

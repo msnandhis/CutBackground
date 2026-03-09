@@ -65,6 +65,32 @@ function requireOneOf(names) {
   fail(`missing one of required env vars: ${names.join(", ")}`);
 }
 
+function getEmailProvider() {
+  return process.env.EMAIL_PROVIDER || "auto";
+}
+
+function requireEmailConfig() {
+  requireEnv("EMAIL_FROM");
+
+  const provider = getEmailProvider();
+
+  if (provider === "resend") {
+    requireEnv("RESEND_API_KEY");
+    return;
+  }
+
+  if (provider === "brevo") {
+    requireEnv("BREVO_API_KEY");
+    return;
+  }
+
+  requireOneOf(["RESEND_API_KEY", "BREVO_API_KEY"]);
+}
+
+function isProductionEnvironment() {
+  return process.env.NODE_ENV === "production";
+}
+
 async function checkPostgres() {
   const databaseUrl = requireEnv("DATABASE_URL");
   const client = new PgClient({
@@ -113,6 +139,10 @@ async function main() {
     requireEnv("BETTER_AUTH_SECRET");
     requireOneOf(["BETTER_AUTH_URL", "NEXT_PUBLIC_BETTER_AUTH_URL"]);
 
+    if (isProductionEnvironment()) {
+      requireEmailConfig();
+    }
+
     if (process.env.ENABLE_BACKGROUND_QUEUE === "true") {
       await checkRedis();
     }
@@ -123,6 +153,11 @@ async function main() {
 
   requireEnv("REPLICATE_API_TOKEN");
   await checkRedis();
+
+  if (isProductionEnvironment()) {
+    requireEnv("REPLICATE_WEBHOOK_SECRET");
+    requireOneOf(["BETTER_AUTH_URL", "NEXT_PUBLIC_BETTER_AUTH_URL"]);
+  }
 
   console.log("startup-check: worker runtime prerequisites are satisfied");
 }

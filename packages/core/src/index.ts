@@ -5,6 +5,7 @@ export { getRedisClient } from "./redis";
 export { getPresignedUploadUrl, getPresignedDownloadUrl } from "./r2";
 export { cancelBackgroundRemoval, runBackgroundRemoval } from "./ai-provider/replicate";
 export { isLocalToolAsset, readToolAsset, storeToolAsset } from "./storage";
+export { sendTransactionalEmail } from "./mail";
 export {
     assertRuntimeRequirements,
     getProductionReadinessSummary,
@@ -12,6 +13,7 @@ export {
     isAuthConfigured,
     isBackgroundQueueConfigured,
     isDatabaseConfigured,
+    isEmailConfigured,
     isR2Configured,
     isRedisConfigured,
     isReplicateConfigured,

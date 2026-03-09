@@ -5,6 +5,7 @@ import {
     requireDashboardApiSession,
     revokeApiKey,
 } from "@/features/dashboard/lib/server/api-keys";
+import { enforceRateLimit } from "@/lib/server/rate-limit";
 
 export async function POST(
     request: Request,
@@ -12,6 +13,13 @@ export async function POST(
 ) {
     try {
         const session = await requireDashboardApiSession(request);
+        await enforceRateLimit({
+            identifier: `user:${session.user.id}:api-keys:revoke`,
+            maxRequests: 20,
+            windowSeconds: 60,
+            code: "RATE_LIMITED",
+            message: "Too many API key revoke attempts in a short period.",
+        });
         const { keyId } = parseRouteParams(await params, apiKeyRouteParamsSchema);
         const key = await revokeApiKey(session.user.id, keyId);
 

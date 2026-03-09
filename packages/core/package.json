@@ -12,6 +12,7 @@
         "./ai-provider/replicate": "./src/ai-provider/replicate.ts",
         "./env": "./src/env/index.ts",
         "./logger": "./src/logger/index.ts",
+        "./mail": "./src/mail/index.ts",
         "./redis": "./src/redis/index.ts",
         "./jobs": "./src/jobs/index.ts",
         "./jobs/tool-worker": "./src/jobs/tool-worker.ts",
@@ -43,6 +44,7 @@
     },
     "devDependencies": {
         "@repo/tsconfig": "workspace:*",
+        "@types/node": "^22.15.0",
         "tsx": "^4.20.6",
         "typescript": "^5.5.0"
     }

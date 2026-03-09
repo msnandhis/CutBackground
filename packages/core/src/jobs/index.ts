@@ -3,7 +3,10 @@ import {
     assertRuntimeRequirements,
     getRedisConnectionOptions,
     isBackgroundQueueEnabled,
+    isBackgroundQueueConfigured,
+    isDatabaseConfigured,
 } from "../env";
+import { getStaleToolJobSummary, recoverStaleToolJobs } from "./recovery";
 
 let toolQueue: Queue | null = null;
 let logQueue: Queue | null = null;
@@ -117,5 +120,41 @@ export function getQueueConnection(): ConnectionOptions {
     return getConnection();
 }
 
+export async function getToolQueueHealth() {
+    if (!isBackgroundQueueConfigured()) {
+        return {
+            configured: false,
+            waiting: 0,
+            active: 0,
+            completed: 0,
+            failed: 0,
+        };
+    }
+
+    const queue = getToolQueue();
+    const counts = await queue.getJobCounts("waiting", "active", "completed", "failed");
+
+    return {
+        configured: true,
+        waiting: counts.waiting ?? 0,
+        active: counts.active ?? 0,
+        completed: counts.completed ?? 0,
+        failed: counts.failed ?? 0,
+    };
+}
+
+export async function recoverStaleJobsIfNeeded() {
+    if (!isDatabaseConfigured()) {
+        return {
+            recoveredCount: 0,
+            thresholdSeconds: 0,
+        };
+    }
+
+    return recoverStaleToolJobs();
+}
+
+export { getStaleToolJobSummary };
+
 export { Queue, Worker };
-export { processToolJobExecution } from "./process-tool-job";
+export { completeToolJobFromReplicateWebhook, processToolJobExecution } from "./process-tool-job";

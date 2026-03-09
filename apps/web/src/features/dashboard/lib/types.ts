@@ -51,3 +51,33 @@ export interface DashboardData {
     jobs: DashboardJob[];
     apiKeys: DashboardApiKey[];
 }
+
+export interface OperatorQueueHealth {
+    configured: boolean;
+    waiting: number;
+    active: number;
+    completed: number;
+    failed: number;
+}
+
+export interface OperatorStaleJobs {
+    staleCount: number;
+    oldestStaleJobAgeSeconds: number;
+    thresholdSeconds: number;
+}
+
+export interface OperatorFailureItem {
+    id: string;
+    status: JobStatus;
+    errorMessage: string | null;
+    createdAtLabel: string;
+    ownerEmail: string | null;
+}
+
+export interface OperatorDashboardData {
+    authorized: boolean;
+    viewer: DashboardViewer;
+    queue: OperatorQueueHealth;
+    staleJobs: OperatorStaleJobs;
+    recentFailures: OperatorFailureItem[];
+}

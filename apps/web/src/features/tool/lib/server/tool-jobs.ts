@@ -160,10 +160,7 @@ export async function getToolJob(jobId: string, userId: string) {
     };
 }
 
-export async function createToolJob(input: {
-    file: File;
-    ip?: string;
-}): Promise<ToolCreateJobResponse> {
+export async function listToolJobsForUser(userId: string, limit = 20) {
     if (!isDatabaseConfigured()) {
         throw apiRouteError({
             status: 503,
@@ -172,6 +169,43 @@ export async function createToolJob(input: {
         });
     }
 
+    const rows = await db.query.jobs.findMany({
+        where: (table, { eq: equals }) => equals(table.userId, userId),
+        orderBy: (table, { desc }) => desc(table.createdAt),
+        limit,
+    });
+
+    return Promise.all(rows.map((row) => getToolJob(row.id, userId)));
+}
+
+export async function getToolJobOutputRef(jobId: string, userId: string) {
+    if (!isDatabaseConfigured()) {
+        throw apiRouteError({
+            status: 503,
+            code: "SERVICE_UNAVAILABLE",
+            message: "Tool jobs are unavailable because the database is not configured.",
+        });
+    }
+
+    const row = await db.query.jobs.findFirst({
+        where: (table, { and, eq: equals }) => and(equals(table.id, jobId), equals(table.userId, userId)),
+    });
+
+    if (!row?.outputUrl) {
+        throw apiRouteError({
+            status: 404,
+            code: "OUTPUT_NOT_FOUND",
+            message: "Output not found.",
+        });
+    }
+
+    return row.outputUrl;
+}
+
+export async function createToolJob(input: {
+    file: File;
+    ip?: string;
+}): Promise<ToolCreateJobResponse> {
     const session = await requireToolSession();
 
     if (!session) {
@@ -179,6 +213,29 @@ export async function createToolJob(input: {
             status: 401,
             code: "UNAUTHORIZED",
             message: "You must be signed in to run the background remover.",
+        });
+    }
+
+    return createToolJobForUser({
+        userId: session.user.id,
+        file: input.file,
+        ip: input.ip,
+        requestIdPrefix: "session",
+    });
+}
+
+export async function createToolJobForUser(input: {
+    userId: string;
+    file: File;
+    ip?: string;
+    requestIdPrefix?: string;
+    completionWebhookUrl?: string | null;
+}): Promise<ToolCreateJobResponse> {
+    if (!isDatabaseConfigured()) {
+        throw apiRouteError({
+            status: 503,
+            code: "SERVICE_UNAVAILABLE",
+            message: "Tool jobs are unavailable because the database is not configured.",
         });
     }
 
@@ -201,25 +258,37 @@ export async function createToolJob(input: {
         });
     }
 
+    if (input.completionWebhookUrl) {
+        try {
+            new URL(input.completionWebhookUrl);
+        } catch {
+            throw apiRouteError({
+                status: 400,
+                code: "INVALID_WEBHOOK_URL",
+                message: "completionWebhookUrl must be a valid URL.",
+            });
+        }
+    }
+
     const jobId = randomUUID();
     const sanitizedFilename = sanitizeFilename(file.name || `upload-${jobId}.png`);
     const requestLogger = createRequestLogger({
-        requestId: jobId,
+        requestId: `${input.requestIdPrefix ?? "job"}-${jobId}`,
         endpoint: `/api/${toolConfig.slug}/jobs`,
         ip: input.ip,
     });
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const storedInputRef = await storeToolAsset({
-        key: `${toolConfig.slug}/${session.user.id}/${jobId}/${sanitizedFilename}`,
+        key: `${toolConfig.slug}/${input.userId}/${jobId}/${sanitizedFilename}`,
         body: buffer,
         contentType: file.type,
     });
 
     const baseRecord = {
         id: jobId,
-        userId: session.user.id,
-        idempotencyKey: `${session.user.id}:${jobId}`,
+        userId: input.userId,
+        idempotencyKey: `${input.userId}:${jobId}`,
         inputType: "image",
         inputUrl: storedInputRef,
         status: "uploading",
@@ -228,6 +297,7 @@ export async function createToolJob(input: {
             filename: file.name,
             contentType: file.type,
             size: file.size,
+            clientWebhookUrl: input.completionWebhookUrl ?? null,
         }),
     } satisfies typeof jobs.$inferInsert;
 
@@ -256,7 +326,7 @@ export async function createToolJob(input: {
             .where(eq(jobs.id, jobId));
     }
 
-    const createdJob = await getToolJob(jobId, session.user.id);
+    const createdJob = await getToolJob(jobId, input.userId);
 
     return {
         job: createdJob,
