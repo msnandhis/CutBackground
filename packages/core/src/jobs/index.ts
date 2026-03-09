@@ -1,9 +1,15 @@
-import { Queue, Worker } from "bullmq";
-import Redis from "ioredis";
+import { Queue, Worker, type ConnectionOptions } from "bullmq";
 
-const connection = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+const redisUrl = new URL(process.env.REDIS_URL || "redis://localhost:6379");
+
+const connection: ConnectionOptions = {
+    host: redisUrl.hostname,
+    port: Number(redisUrl.port || 6379),
+    username: redisUrl.username || undefined,
+    password: redisUrl.password || undefined,
+    db: redisUrl.pathname ? Number(redisUrl.pathname.slice(1) || 0) : 0,
     maxRetriesPerRequest: null,
-});
+};
 
 // ── Tool Processing Queue ──────────────────────────────────
 export const toolQueue = new Queue("tool-processing", { connection });
@@ -47,7 +53,7 @@ export interface LogEntry {
 
 /**
  * Push a structured log entry to the batch queue.
- * A scheduled worker will flush these to Supabase periodically.
+ * A scheduled worker can flush these to the configured database or log sink.
  */
 export async function pushLogEntry(entry: LogEntry) {
     return logQueue.add("log", entry, {

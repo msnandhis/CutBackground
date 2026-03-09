@@ -51,7 +51,7 @@ export function Testimonials() {
 
                 {/* Cards */}
                 <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {testimonials.map((t, i) => (
+                    {testimonials.map((t) => (
                         <div
                             key={t.name}
                             className={`rounded-3xl ${t.bg} p-8 transition-all hover:-translate-y-1 hover:shadow-xl`}

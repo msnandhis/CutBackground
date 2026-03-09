@@ -3,12 +3,13 @@ import { siteConfig } from "@config/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
+    metadataBase: new URL(siteConfig.domain),
     title: {
         default: siteConfig.name,
         template: `%s | ${siteConfig.name}`,
     },
     description: siteConfig.description,
-    keywords: siteConfig.keywords,
+    keywords: [...siteConfig.keywords],
     openGraph: {
         title: siteConfig.name,
         description: siteConfig.description,

@@ -10,8 +10,17 @@
         "clean": "rm -rf dist node_modules"
     },
     "devDependencies": {
+        "@repo/eslint-config": "workspace:*",
         "@repo/tsconfig": "workspace:*",
+        "@types/react": "^19.1.0",
+        "@types/react-dom": "^19.1.0",
+        "@typescript-eslint/parser": "^8.0.0",
+        "eslint": "^9.25.0",
         "typescript": "^5.5.0"
+    },
+    "dependencies": {
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
     },
     "peerDependencies": {
         "react": "^19.0.0",
