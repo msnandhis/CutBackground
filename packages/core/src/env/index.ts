@@ -25,6 +25,8 @@ const envSchema = z.object({
     REPLICATE_BACKGROUND_REMOVER_MODEL: z.string().min(1).optional(),
     REPLICATE_WEBHOOK_SECRET: z.string().min(1).optional(),
     REPLICATE_WEBHOOK_TOLERANCE_SECONDS: z.coerce.number().int().positive().optional(),
+    TOOL_EXECUTION_MODE: z.enum(["replicate", "mock"]).optional(),
+    TOOL_MOCK_DELAY_MS: z.coerce.number().int().min(0).optional(),
     EMAIL_PROVIDER: z.enum(["auto", "resend", "brevo"]).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
     BREVO_API_KEY: z.string().min(1).optional(),
@@ -222,6 +224,17 @@ export function getR2DependencyStatus(): RuntimeDependencyStatus {
 }
 
 export function getReplicateConfig() {
+    if (env.TOOL_EXECUTION_MODE === "mock") {
+        return {
+            apiToken: env.REPLICATE_API_TOKEN ?? "mock",
+            model: "mock/background-remover",
+            attempts: 1,
+            retryDelayMs: 0,
+            webhookSecret: env.REPLICATE_WEBHOOK_SECRET ?? null,
+            webhookToleranceSeconds: env.REPLICATE_WEBHOOK_TOLERANCE_SECONDS ?? 300,
+        };
+    }
+
     if (!env.REPLICATE_API_TOKEN) {
         return null;
     }
@@ -237,14 +250,36 @@ export function getReplicateConfig() {
 }
 
 export function isReplicateConfigured() {
-    return Boolean(getReplicateConfig());
+    return env.TOOL_EXECUTION_MODE === "mock" || Boolean(getReplicateConfig());
 }
 
 export function getReplicateDependencyStatus(): RuntimeDependencyStatus {
+    if (env.TOOL_EXECUTION_MODE === "mock") {
+        return {
+            name: "replicate",
+            configured: true,
+            requiredEnv: [],
+            missingEnv: [],
+            note: "Mock execution mode is enabled for local development or end-to-end testing.",
+        };
+    }
+
     return {
         ...requireDependencyStatus("replicate", ["REPLICATE_API_TOKEN"]),
         note: "Required for real background-removal execution.",
     };
+}
+
+export function getToolExecutionMode() {
+    return env.TOOL_EXECUTION_MODE ?? "replicate";
+}
+
+export function isMockToolExecutionEnabled() {
+    return getToolExecutionMode() === "mock";
+}
+
+export function getToolMockDelayMs() {
+    return env.TOOL_MOCK_DELAY_MS ?? 0;
 }
 
 export type EmailProvider = "resend" | "brevo";

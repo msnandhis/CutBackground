@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, jobs } from "@repo/database";
 import { createBackgroundRemovalPrediction, downloadPredictionOutput, runBackgroundRemoval, type ReplicatePredictionPayload } from "../ai-provider/replicate";
@@ -53,14 +54,41 @@ async function updateJobMetadata(jobId: string, metadata: Record<string, unknown
         .where(eq(jobs.id, jobId));
 }
 
+function buildClientWebhookHeaders(params: {
+    event: string;
+    payload: string;
+    secret: string | null;
+}) {
+    const timestamp = new Date().toISOString();
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "User-Agent": "CutBackground-Webhooks/1.0",
+        "X-CutBackground-Event": params.event,
+        "X-CutBackground-Timestamp": timestamp,
+    };
+
+    if (params.secret) {
+        const signature = createHmac("sha256", params.secret)
+            .update(`${timestamp}.${params.payload}`)
+            .digest("hex");
+
+        headers["X-CutBackground-Signature"] = signature;
+    }
+
+    return headers;
+}
+
 async function deliverClientWebhook(job: typeof jobs.$inferSelect, params: { status: string; outputUrl: string | null; errorMessage: string | null }) {
     const metadata = parseJobMetadata(job.metadata);
     const webhookUrl = typeof metadata.clientWebhookUrl === "string" ? metadata.clientWebhookUrl : null;
+    const webhookSecret =
+        typeof metadata.clientWebhookSecret === "string" ? metadata.clientWebhookSecret : null;
 
     if (!webhookUrl) {
         return;
     }
 
+    const event = "background_remover.job.completed";
     const payload = {
         event: "background_remover.job.completed",
         job: {
@@ -77,32 +105,65 @@ async function deliverClientWebhook(job: typeof jobs.$inferSelect, params: { sta
             completedAt: new Date().toISOString(),
         },
     };
+    const payloadText = JSON.stringify(payload);
+    const maxAttempts = 3;
+    const deliveryAttempts = Array.isArray(metadata.clientWebhookAttempts)
+        ? [...metadata.clientWebhookAttempts]
+        : [];
 
-    try {
-        const response = await fetch(webhookUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            const response = await fetch(webhookUrl, {
+                method: "POST",
+                headers: buildClientWebhookHeaders({
+                    event,
+                    payload: payloadText,
+                    secret: webhookSecret,
+                }),
+                body: payloadText,
+            });
 
-        const nextMetadata = {
-            ...metadata,
-            clientWebhookDeliveredAt: new Date().toISOString(),
-            clientWebhookStatus: response.status,
-        };
+            deliveryAttempts.push({
+                attempt,
+                status: response.status,
+                deliveredAt: new Date().toISOString(),
+            });
 
-        await updateJobMetadata(job.id, nextMetadata);
-    } catch (error) {
-        const nextMetadata = {
-            ...metadata,
-            clientWebhookFailedAt: new Date().toISOString(),
-            clientWebhookError:
-                error instanceof Error ? error.message : "Unknown webhook delivery error",
-        };
+            if (!response.ok) {
+                throw new Error(`Webhook delivery failed with status ${response.status}.`);
+            }
 
-        await updateJobMetadata(job.id, nextMetadata);
+            await updateJobMetadata(job.id, {
+                ...metadata,
+                clientWebhookDeliveredAt: new Date().toISOString(),
+                clientWebhookStatus: response.status,
+                clientWebhookAttempts: deliveryAttempts,
+                clientWebhookLastEvent: event,
+            });
+
+            return;
+        } catch (error) {
+            deliveryAttempts.push({
+                attempt,
+                status: "failed",
+                deliveredAt: new Date().toISOString(),
+                error: error instanceof Error ? error.message : "Unknown webhook delivery error",
+            });
+
+            if (attempt < maxAttempts) {
+                await sleep(500 * attempt);
+                continue;
+            }
+
+            await updateJobMetadata(job.id, {
+                ...metadata,
+                clientWebhookFailedAt: new Date().toISOString(),
+                clientWebhookError:
+                    error instanceof Error ? error.message : "Unknown webhook delivery error",
+                clientWebhookAttempts: deliveryAttempts,
+                clientWebhookLastEvent: event,
+            });
+        }
     }
 }
 

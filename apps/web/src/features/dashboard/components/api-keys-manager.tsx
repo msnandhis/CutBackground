@@ -64,7 +64,6 @@ export function ApiKeysManager({ keys: initialKeys }: { keys: DashboardApiKey[] 
             setRevealedKey(payload);
             setSuccessMessage("API key created. Copy the secret now, it will not be shown again.");
             setName("");
-            router.refresh();
         });
     }
 
@@ -119,12 +118,14 @@ export function ApiKeysManager({ keys: initialKeys }: { keys: DashboardApiKey[] 
                             onChange={(event) => setName(event.target.value)}
                             placeholder="Production worker"
                             maxLength={48}
+                            data-testid="api-key-name"
                             className="mt-2 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none transition focus:border-brand-accent"
                             disabled={isPending}
                         />
                     </label>
                     <button
                         type="submit"
+                        data-testid="api-key-create"
                         disabled={isPending || name.trim().length < 2}
                         className="rounded-full bg-brand-dark px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-accent disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -151,7 +152,7 @@ export function ApiKeysManager({ keys: initialKeys }: { keys: DashboardApiKey[] 
                         Copy this key now. It will not be shown again.
                     </p>
                     <p className="mt-3 rounded-2xl bg-white px-4 py-3 font-mono text-sm text-brand-dark">
-                        {revealedKey.plainTextKey}
+                        <span data-testid="api-key-secret">{revealedKey.plainTextKey}</span>
                     </p>
                 </div>
             ) : null}
@@ -168,6 +169,7 @@ export function ApiKeysManager({ keys: initialKeys }: { keys: DashboardApiKey[] 
                     {keys.map((key) => (
                         <div
                             key={key.id}
+                            data-testid={`api-key-card-${key.id}`}
                             className="rounded-[2rem] border border-neutral-200 bg-white p-6 shadow-sm"
                         >
                             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -190,6 +192,7 @@ export function ApiKeysManager({ keys: initialKeys }: { keys: DashboardApiKey[] 
                                 </div>
                                 <button
                                     type="button"
+                                    data-testid={`api-key-revoke-${key.id}`}
                                     onClick={() => handleRevoke(key.id)}
                                     disabled={isPending || key.status === "revoked"}
                                     className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"

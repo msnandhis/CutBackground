@@ -74,10 +74,18 @@ export interface OperatorFailureItem {
     ownerEmail: string | null;
 }
 
+export interface OperatorAttentionJob {
+    id: string;
+    status: JobStatus;
+    createdAtLabel: string;
+    ownerEmail: string | null;
+}
+
 export interface OperatorDashboardData {
     authorized: boolean;
     viewer: DashboardViewer;
     queue: OperatorQueueHealth;
     staleJobs: OperatorStaleJobs;
     recentFailures: OperatorFailureItem[];
+    attentionJobs: OperatorAttentionJob[];
 }

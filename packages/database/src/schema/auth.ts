@@ -15,6 +15,7 @@ export const users = pgTable("user", {
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+export const user = users;
 
 export const sessions = pgTable("session", {
     id: text("id").primaryKey(),
@@ -28,6 +29,7 @@ export const sessions = pgTable("session", {
         .notNull()
         .references(() => users.id, { onDelete: "cascade" }),
 });
+export const session = sessions;
 
 export const accounts = pgTable("account", {
     id: text("id").primaryKey(),
@@ -50,6 +52,7 @@ export const accounts = pgTable("account", {
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+export const account = accounts;
 
 export const verifications = pgTable("verification", {
     id: text("id").primaryKey(),
@@ -59,6 +62,7 @@ export const verifications = pgTable("verification", {
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
+export const verification = verifications;
 
 export const rateLimits = pgTable("rate_limit", {
     key: text("key").primaryKey(),
@@ -67,3 +71,4 @@ export const rateLimits = pgTable("rate_limit", {
         .notNull()
         .defaultNow(),
 });
+export const rateLimit = rateLimits;

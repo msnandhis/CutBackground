@@ -154,7 +154,7 @@ export async function recoverStaleJobsIfNeeded() {
     return recoverStaleToolJobs();
 }
 
-export { getStaleToolJobSummary };
+export { getStaleToolJobSummary, recoverStaleToolJobs };
 
 export { Queue, Worker };
 export { completeToolJobFromReplicateWebhook, processToolJobExecution } from "./process-tool-job";

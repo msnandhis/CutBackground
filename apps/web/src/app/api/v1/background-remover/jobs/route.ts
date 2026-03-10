@@ -47,6 +47,7 @@ export async function POST(request: Request) {
         const formData = await request.formData();
         const file = formData.get("file");
         const webhookUrl = formData.get("webhookUrl");
+        const webhookSecret = formData.get("webhookSecret");
 
         if (!(file instanceof File)) {
             throw apiRouteError({
@@ -64,12 +65,21 @@ export async function POST(request: Request) {
             });
         }
 
+        if (webhookSecret !== null && typeof webhookSecret !== "string") {
+            throw apiRouteError({
+                status: 400,
+                code: "INVALID_WEBHOOK_SECRET",
+                message: "webhookSecret must be a string when provided.",
+            });
+        }
+
         const response = await createToolJobForUser({
             userId: principal.userId,
             file,
             ip: request.headers.get("x-forwarded-for") ?? undefined,
             requestIdPrefix: "api",
             completionWebhookUrl: webhookUrl || null,
+            completionWebhookSecret: webhookSecret || null,
         });
 
         return NextResponse.json({ job: toApiJobOutput(response.job) }, {

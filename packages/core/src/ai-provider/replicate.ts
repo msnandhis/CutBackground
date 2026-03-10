@@ -1,8 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import Replicate from "replicate";
-import { assertRuntimeRequirements, getReplicateConfig, getServerAuthBaseUrl } from "../env";
+import { assertRuntimeRequirements, getReplicateConfig, getServerAuthBaseUrl, getToolMockDelayMs, isMockToolExecutionEnabled } from "../env";
 
 function getClient() {
+    if (isMockToolExecutionEnabled()) {
+        throw new Error("Replicate client is unavailable in mock execution mode.");
+    }
+
     assertRuntimeRequirements("replicate");
     return new Replicate({ auth: getReplicateConfig()!.apiToken });
 }
@@ -165,6 +169,10 @@ export async function createBackgroundRemovalPrediction(params: {
     webhook?: boolean;
 }) {
     void params.filename;
+    if (isMockToolExecutionEnabled()) {
+        throw new Error("Webhook predictions are not available in mock execution mode.");
+    }
+
     const replicate = getClient();
     const prediction = await replicate.predictions.create({
         model: getModel(),
@@ -186,6 +194,32 @@ export async function runBackgroundRemoval(params: {
     image: Buffer;
     filename: string;
 }) {
+    if (isMockToolExecutionEnabled()) {
+        const delayMs = getToolMockDelayMs();
+
+        if (delayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+
+        return {
+            provider: "mock",
+            model: "mock/background-remover",
+            providerJobId: `mock-${Date.now()}`,
+            providerStatus: "succeeded",
+            providerVersion: "mock-v1",
+            logs: "Mock execution completed successfully.",
+            metrics: {
+                mocked: true,
+                filename: params.filename,
+            },
+            startedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+            outputSourceUrl: null,
+            bytes: params.image,
+            contentType: "image/png",
+        };
+    }
+
     const prediction = await createBackgroundRemovalPrediction({
         image: params.image,
         filename: params.filename,
@@ -225,6 +259,10 @@ export async function cancelBackgroundRemoval(predictionId: string) {
 }
 
 export function verifyReplicateWebhook(rawBody: string, headers: Headers) {
+    if (isMockToolExecutionEnabled()) {
+        return true;
+    }
+
     const secret = getReplicateConfig()?.webhookSecret;
 
     if (!secret) {

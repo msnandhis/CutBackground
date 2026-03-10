@@ -230,6 +230,7 @@ export async function createToolJobForUser(input: {
     ip?: string;
     requestIdPrefix?: string;
     completionWebhookUrl?: string | null;
+    completionWebhookSecret?: string | null;
 }): Promise<ToolCreateJobResponse> {
     if (!isDatabaseConfigured()) {
         throw apiRouteError({
@@ -270,6 +271,14 @@ export async function createToolJobForUser(input: {
         }
     }
 
+    if (input.completionWebhookSecret && input.completionWebhookSecret.length > 255) {
+        throw apiRouteError({
+            status: 400,
+            code: "INVALID_WEBHOOK_SECRET",
+            message: "completionWebhookSecret must be 255 characters or fewer.",
+        });
+    }
+
     const jobId = randomUUID();
     const sanitizedFilename = sanitizeFilename(file.name || `upload-${jobId}.png`);
     const requestLogger = createRequestLogger({
@@ -298,6 +307,7 @@ export async function createToolJobForUser(input: {
             contentType: file.type,
             size: file.size,
             clientWebhookUrl: input.completionWebhookUrl ?? null,
+            clientWebhookSecret: input.completionWebhookSecret ?? null,
         }),
     } satisfies typeof jobs.$inferInsert;
 

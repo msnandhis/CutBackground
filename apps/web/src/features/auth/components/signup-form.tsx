@@ -65,6 +65,7 @@ export function SignupForm() {
                 <input
                     type="text"
                     name="name"
+                    data-testid="signup-name"
                     required
                     className="w-full rounded-2xl border border-neutral-200 px-4 py-3 outline-none"
                     placeholder="Ava Martin"
@@ -75,6 +76,7 @@ export function SignupForm() {
                 <input
                     type="email"
                     name="email"
+                    data-testid="signup-email"
                     required
                     className="w-full rounded-2xl border border-neutral-200 px-4 py-3 outline-none"
                     placeholder="you@company.com"
@@ -85,6 +87,7 @@ export function SignupForm() {
                 <input
                     type="password"
                     name="password"
+                    data-testid="signup-password"
                     required
                     className="w-full rounded-2xl border border-neutral-200 px-4 py-3 outline-none"
                     placeholder="At least 8 characters"
@@ -95,6 +98,7 @@ export function SignupForm() {
                 <input
                     type="password"
                     name="confirmPassword"
+                    data-testid="signup-confirm-password"
                     required
                     className="w-full rounded-2xl border border-neutral-200 px-4 py-3 outline-none"
                     placeholder="Repeat your password"
@@ -102,7 +106,7 @@ export function SignupForm() {
             </label>
             {successMessage ? <AuthFeedback tone="success" message={successMessage} /> : null}
             {errorMessage ? <AuthFeedback tone="error" message={errorMessage} /> : null}
-            <Button type="submit" className="w-full" disabled={isPending}>
+            <Button type="submit" className="w-full" disabled={isPending} data-testid="signup-submit">
                 {isPending ? "Creating account..." : "Create account"}
             </Button>
             <p className="text-sm text-neutral-500">

@@ -97,6 +97,7 @@ export function LoginForm({ redirectTo = routes.dashboard }: { redirectTo?: stri
                     <input
                         type="email"
                         name="email"
+                        data-testid="login-email"
                         required
                         className="w-full rounded-2xl border border-neutral-200 px-4 py-3 outline-none"
                         placeholder="team@cutbackground.com"
@@ -108,6 +109,7 @@ export function LoginForm({ redirectTo = routes.dashboard }: { redirectTo?: stri
                         <input
                             type="password"
                             name="password"
+                            data-testid="login-password"
                             required
                             className="w-full rounded-2xl border border-neutral-200 px-4 py-3 outline-none"
                             placeholder="Enter your password"
@@ -118,7 +120,7 @@ export function LoginForm({ redirectTo = routes.dashboard }: { redirectTo?: stri
                 {successMessage ? <AuthFeedback tone="success" message={successMessage} /> : null}
                 {errorMessage ? <AuthFeedback tone="error" message={errorMessage} /> : null}
 
-                <Button type="submit" className="w-full" disabled={isPending}>
+                <Button type="submit" className="w-full" disabled={isPending} data-testid="login-submit">
                     {isPending
                         ? mode === "password"
                             ? "Signing in..."

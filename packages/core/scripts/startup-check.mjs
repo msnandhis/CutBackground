@@ -91,6 +91,10 @@ function isProductionEnvironment() {
   return process.env.NODE_ENV === "production";
 }
 
+function isMockToolExecution() {
+  return process.env.TOOL_EXECUTION_MODE === "mock";
+}
+
 async function checkPostgres() {
   const databaseUrl = requireEnv("DATABASE_URL");
   const client = new PgClient({
@@ -151,10 +155,12 @@ async function main() {
     return;
   }
 
-  requireEnv("REPLICATE_API_TOKEN");
+  if (!isMockToolExecution()) {
+    requireEnv("REPLICATE_API_TOKEN");
+  }
   await checkRedis();
 
-  if (isProductionEnvironment()) {
+  if (isProductionEnvironment() && !isMockToolExecution()) {
     requireEnv("REPLICATE_WEBHOOK_SECRET");
     requireOneOf(["BETTER_AUTH_URL", "NEXT_PUBLIC_BETTER_AUTH_URL"]);
   }

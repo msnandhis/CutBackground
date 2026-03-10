@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DashboardShell } from "@/components/site/dashboard-shell";
 import { StatusBadge } from "@/components/site/status-badge";
+import { OperatorActionsPanel } from "@/features/dashboard/components/operator-actions-panel";
 import { getOperatorDashboardData } from "@/features/dashboard/lib/server/dashboard-data";
 import { routes } from "@/lib/routes";
 
@@ -49,6 +50,14 @@ export default async function DashboardOperationsPage() {
                                 {data.staleJobs.thresholdSeconds}s.
                             </p>
                         </div>
+                    </div>
+
+                    <div className="mt-8 rounded-[2rem] border border-neutral-200 bg-white p-6 shadow-sm">
+                        <OperatorActionsPanel
+                            staleJobs={data.staleJobs}
+                            recentFailures={data.recentFailures}
+                            attentionJobs={data.attentionJobs}
+                        />
                     </div>
 
                     <div className="mt-8 rounded-[2rem] border border-neutral-200 bg-white p-6 shadow-sm">

@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import { apiKeys, db, jobs, users } from "@repo/database";
 import { getPresignedDownloadUrl } from "@repo/core/r2";
 import { isLocalToolAsset } from "@repo/core/storage";
@@ -17,6 +17,7 @@ import type {
     DashboardData,
     DashboardJob,
     DashboardJobDetail,
+    OperatorAttentionJob,
     OperatorDashboardData,
     OperatorFailureItem,
     DashboardStat,
@@ -126,6 +127,15 @@ function toOperatorFailureItem(row: typeof jobs.$inferSelect & { ownerEmail: str
         id: row.id,
         status: row.status as JobStatus,
         errorMessage: row.errorMessage,
+        createdAtLabel: formatDate(row.createdAt),
+        ownerEmail: row.ownerEmail,
+    };
+}
+
+function toOperatorAttentionJob(row: typeof jobs.$inferSelect & { ownerEmail: string | null }): OperatorAttentionJob {
+    return {
+        id: row.id,
+        status: row.status as JobStatus,
         createdAtLabel: formatDate(row.createdAt),
         ownerEmail: row.ownerEmail,
     };
@@ -302,10 +312,11 @@ export async function getOperatorDashboardData(): Promise<OperatorDashboardData>
                 thresholdSeconds: 0,
             },
             recentFailures: [],
+            attentionJobs: [],
         };
     }
 
-    const [queue, staleJobs, failureRows] = await Promise.all([
+    const [queue, staleJobs, failureRows, attentionRows] = await Promise.all([
         getToolQueueHealth(),
         getStaleToolJobSummary(),
         db
@@ -333,6 +344,31 @@ export async function getOperatorDashboardData(): Promise<OperatorDashboardData>
             .where(eq(jobs.status, "failed"))
             .orderBy(desc(jobs.createdAt))
             .limit(8),
+        db
+            .select({
+                id: jobs.id,
+                userId: jobs.userId,
+                idempotencyKey: jobs.idempotencyKey,
+                inputType: jobs.inputType,
+                inputUrl: jobs.inputUrl,
+                outputUrl: jobs.outputUrl,
+                status: jobs.status,
+                provider: jobs.provider,
+                providerJobId: jobs.providerJobId,
+                modelUsed: jobs.modelUsed,
+                errorMessage: jobs.errorMessage,
+                metadata: jobs.metadata,
+                ipAddress: jobs.ipAddress,
+                fingerprint: jobs.fingerprint,
+                createdAt: jobs.createdAt,
+                completedAt: jobs.completedAt,
+                ownerEmail: users.email,
+            })
+            .from(jobs)
+            .leftJoin(users, eq(users.id, jobs.userId))
+            .where(or(eq(jobs.status, "pending"), eq(jobs.status, "processing")))
+            .orderBy(desc(jobs.createdAt))
+            .limit(8),
     ]);
 
     return {
@@ -341,5 +377,6 @@ export async function getOperatorDashboardData(): Promise<OperatorDashboardData>
         queue,
         staleJobs,
         recentFailures: failureRows.map(toOperatorFailureItem),
+        attentionJobs: attentionRows.map(toOperatorAttentionJob),
     };
 }
