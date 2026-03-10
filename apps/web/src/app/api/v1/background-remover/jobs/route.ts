@@ -78,6 +78,7 @@ export async function POST(request: Request) {
             file,
             ip: request.headers.get("x-forwarded-for") ?? undefined,
             requestIdPrefix: "api",
+            idempotencyKey: request.headers.get("idempotency-key"),
             completionWebhookUrl: webhookUrl || null,
             completionWebhookSecret: webhookSecret || null,
         });

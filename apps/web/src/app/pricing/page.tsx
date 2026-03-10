@@ -10,7 +10,7 @@ export default function PricingPage() {
                     <PageIntro
                         eyebrow="Pricing"
                         title="Simple credit-based pricing for web and API usage"
-                        description="The frontend is mocked, but the commercial model is already represented around unified credit usage, developer keys, and dashboard visibility."
+                        description="Choose a plan based on monthly volume, team workflows, and API usage. Every tier uses the same core background-removal pipeline and dashboard controls."
                         align="center"
                     />
                     <div className="mt-12 grid gap-6 lg:grid-cols-3">

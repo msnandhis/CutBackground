@@ -4,6 +4,7 @@ import { db, jobs } from "@repo/database";
 import { createBackgroundRemovalPrediction, downloadPredictionOutput, runBackgroundRemoval, type ReplicatePredictionPayload } from "../ai-provider/replicate";
 import { getReplicateConfig, getServerAuthBaseUrl } from "../env";
 import { logger } from "../logger";
+import { assertSafeWebhookUrl } from "../security/safe-webhook-url";
 import { readToolAsset, storeToolAsset } from "../storage";
 
 const providerAttempts = getReplicateConfig()?.attempts ?? 3;
@@ -87,6 +88,8 @@ async function deliverClientWebhook(job: typeof jobs.$inferSelect, params: { sta
     if (!webhookUrl) {
         return;
     }
+
+    await assertSafeWebhookUrl(webhookUrl);
 
     const event = "background_remover.job.completed";
     const payload = {

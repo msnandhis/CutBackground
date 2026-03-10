@@ -8,6 +8,7 @@ import { auth } from "@repo/core/auth/server";
 import { cancelQueuedToolJob, enqueueToolJob } from "@repo/core/jobs";
 import { processToolJobExecution } from "@repo/core/jobs";
 import { cancelBackgroundRemoval } from "@repo/core/ai-provider/replicate";
+import { assertSafeWebhookUrl } from "@repo/core/security/safe-webhook-url";
 import {
     isAuthConfigured,
     isBackgroundQueueConfigured,
@@ -20,6 +21,7 @@ import { toolConfig } from "@config/tool";
 import { apiRouteError } from "@/lib/server/api";
 import type { JobStatus } from "@/lib/types";
 import type { ToolCreateJobResponse, ToolJobDto } from "../types";
+import { validateImageUpload } from "./upload-validation";
 
 const queueEnabled = isBackgroundQueueConfigured();
 
@@ -57,6 +59,73 @@ function parseMetadata(value: string | null) {
     } catch {
         return {};
     }
+}
+
+function isUniqueConstraintViolation(error: unknown) {
+    return (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: string }).code === "23505"
+    );
+}
+
+function normalizeIdempotencyKey(userId: string, value: string | null | undefined) {
+    if (!value) {
+        return null;
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed || trimmed.length > 120 || /[^\w.:-]/.test(trimmed)) {
+        throw apiRouteError({
+            status: 400,
+            code: "INVALID_IDEMPOTENCY_KEY",
+            message:
+                "Idempotency-Key must be 1 to 120 characters and use only letters, numbers, dot, colon, underscore, or dash.",
+        });
+    }
+
+    return `${userId}:${trimmed}`;
+}
+
+async function getExistingIdempotentJob(params: {
+    userId: string;
+    normalizedIdempotencyKey: string | null;
+    inputSha256: string;
+}) {
+    const normalizedIdempotencyKey = params.normalizedIdempotencyKey;
+
+    if (!normalizedIdempotencyKey) {
+        return null;
+    }
+
+    const existing = await db.query.jobs.findFirst({
+        where: (table, { and, eq: equals }) =>
+            and(
+                equals(table.userId, params.userId),
+                equals(table.idempotencyKey, normalizedIdempotencyKey)
+            ),
+    });
+
+    if (!existing) {
+        return null;
+    }
+
+    const existingMetadata = parseMetadata(existing.metadata);
+
+    if (
+        typeof existingMetadata.inputSha256 === "string" &&
+        existingMetadata.inputSha256 !== params.inputSha256
+    ) {
+        throw apiRouteError({
+            status: 409,
+            code: "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_INPUT",
+            message: "This Idempotency-Key has already been used for a different file.",
+        });
+    }
+
+    return getToolJob(existing.id, params.userId);
 }
 
 async function dispatchJob(jobId: string, inputUrl: string, filename: string) {
@@ -205,6 +274,7 @@ export async function getToolJobOutputRef(jobId: string, userId: string) {
 export async function createToolJob(input: {
     file: File;
     ip?: string;
+    idempotencyKey?: string | null;
 }): Promise<ToolCreateJobResponse> {
     const session = await requireToolSession();
 
@@ -220,6 +290,7 @@ export async function createToolJob(input: {
         userId: session.user.id,
         file: input.file,
         ip: input.ip,
+        idempotencyKey: input.idempotencyKey,
         requestIdPrefix: "session",
     });
 }
@@ -229,6 +300,7 @@ export async function createToolJobForUser(input: {
     file: File;
     ip?: string;
     requestIdPrefix?: string;
+    idempotencyKey?: string | null;
     completionWebhookUrl?: string | null;
     completionWebhookSecret?: string | null;
 }): Promise<ToolCreateJobResponse> {
@@ -243,14 +315,6 @@ export async function createToolJobForUser(input: {
     const file = input.file;
     const maxFileSizeBytes = toolConfig.input.maxFileSizeMB * 1024 * 1024;
 
-    if (!toolConfig.input.acceptedMimeTypes.includes(file.type as (typeof toolConfig.input.acceptedMimeTypes)[number])) {
-        throw apiRouteError({
-            status: 400,
-            code: "UNSUPPORTED_FILE_TYPE",
-            message: "Unsupported file type for this tool.",
-        });
-    }
-
     if (file.size > maxFileSizeBytes) {
         throw apiRouteError({
             status: 400,
@@ -261,7 +325,7 @@ export async function createToolJobForUser(input: {
 
     if (input.completionWebhookUrl) {
         try {
-            new URL(input.completionWebhookUrl);
+            await assertSafeWebhookUrl(input.completionWebhookUrl);
         } catch {
             throw apiRouteError({
                 status: 400,
@@ -279,39 +343,86 @@ export async function createToolJobForUser(input: {
         });
     }
 
+    const validatedUpload = await validateImageUpload(file);
+
+    if (
+        !toolConfig.input.acceptedMimeTypes.includes(
+            validatedUpload.detectedMimeType as (typeof toolConfig.input.acceptedMimeTypes)[number]
+        )
+    ) {
+        throw apiRouteError({
+            status: 400,
+            code: "UNSUPPORTED_FILE_TYPE",
+            message: "Unsupported file type for this tool.",
+        });
+    }
+
+    const normalizedIdempotencyKey = normalizeIdempotencyKey(input.userId, input.idempotencyKey);
+    const existingJob = await getExistingIdempotentJob({
+        userId: input.userId,
+        normalizedIdempotencyKey,
+        inputSha256: validatedUpload.sha256,
+    });
+
+    if (existingJob) {
+        return {
+            job: existingJob,
+        };
+    }
+
     const jobId = randomUUID();
     const sanitizedFilename = sanitizeFilename(file.name || `upload-${jobId}.png`);
+    const persistedIdempotencyKey = normalizedIdempotencyKey ?? `${input.userId}:${jobId}`;
     const requestLogger = createRequestLogger({
         requestId: `${input.requestIdPrefix ?? "job"}-${jobId}`,
         endpoint: `/api/${toolConfig.slug}/jobs`,
         ip: input.ip,
     });
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const storedInputRef = await storeToolAsset({
         key: `${toolConfig.slug}/${input.userId}/${jobId}/${sanitizedFilename}`,
-        body: buffer,
-        contentType: file.type,
+        body: validatedUpload.buffer,
+        contentType: validatedUpload.detectedMimeType,
     });
 
     const baseRecord = {
         id: jobId,
         userId: input.userId,
-        idempotencyKey: `${input.userId}:${jobId}`,
+        idempotencyKey: persistedIdempotencyKey,
         inputType: "image",
         inputUrl: storedInputRef,
         status: "uploading",
         ipAddress: input.ip ?? null,
         metadata: JSON.stringify({
             filename: file.name,
-            contentType: file.type,
+            contentType: validatedUpload.detectedMimeType,
+            clientContentType: file.type || null,
             size: file.size,
+            inputSha256: validatedUpload.sha256,
             clientWebhookUrl: input.completionWebhookUrl ?? null,
             clientWebhookSecret: input.completionWebhookSecret ?? null,
         }),
     } satisfies typeof jobs.$inferInsert;
 
-    await db.insert(jobs).values(baseRecord);
+    try {
+        await db.insert(jobs).values(baseRecord);
+    } catch (error) {
+        if (isUniqueConstraintViolation(error)) {
+            const raceRecoveredJob = await getExistingIdempotentJob({
+                userId: input.userId,
+                normalizedIdempotencyKey: persistedIdempotencyKey,
+                inputSha256: validatedUpload.sha256,
+            });
+
+            if (raceRecoveredJob) {
+                return {
+                    job: raceRecoveredJob,
+                };
+            }
+        }
+
+        throw error;
+    }
 
     try {
         await dispatchJob(jobId, storedInputRef, file.name);

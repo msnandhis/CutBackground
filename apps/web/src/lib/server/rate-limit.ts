@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isRedisConfigured } from "@repo/core/env";
+import { isProductionRuntime, isRedisConfigured } from "@repo/core/env";
 import { rateLimitUser } from "@repo/core/redis";
 import { apiRouteError } from "./api";
 
@@ -12,6 +12,14 @@ export async function enforceRateLimit(params: {
     message: string;
 }) {
     if (!isRedisConfigured()) {
+        if (isProductionRuntime()) {
+            throw apiRouteError({
+                status: 503,
+                code: "RATE_LIMITING_UNAVAILABLE",
+                message: "Rate limiting is unavailable because Redis is not configured.",
+            });
+        }
+
         return;
     }
 

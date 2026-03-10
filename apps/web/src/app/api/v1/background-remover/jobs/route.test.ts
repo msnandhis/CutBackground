@@ -73,7 +73,7 @@ describe("/api/v1/background-remover/jobs", () => {
         expect(payload.jobs[0].outputUrl).toBe("/api/v1/background-remover/jobs/job_123/output");
     });
 
-    it("creates a job and forwards webhookUrl when provided", async () => {
+    it("creates a job and forwards webhookUrl and idempotency key when provided", async () => {
         requireApiKeyPrincipalMock.mockResolvedValue({
             apiKeyId: "key_123",
             userId: "user_123",
@@ -94,6 +94,9 @@ describe("/api/v1/background-remover/jobs", () => {
         const response = await POST(
             new Request("http://localhost:3000/api/v1/background-remover/jobs", {
                 method: "POST",
+                headers: {
+                    "Idempotency-Key": "retry-123",
+                },
                 body: formData,
             })
         );
@@ -102,6 +105,7 @@ describe("/api/v1/background-remover/jobs", () => {
         expect(createToolJobForUserMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: "user_123",
+                idempotencyKey: "retry-123",
                 completionWebhookUrl: "https://example.com/hooks/jobs",
             })
         );

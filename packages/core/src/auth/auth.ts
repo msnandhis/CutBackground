@@ -7,9 +7,12 @@ import { logger } from "../logger";
 import { buildTransactionalActionEmail, sendTransactionalEmail } from "../mail";
 
 const authBaseUrl = getServerAuthBaseUrl();
-const authSecret =
-    getAuthSecret() ??
-    "Q8y2vN4mL7rP1xT5kC9dF3hJ6sW0bZ4qR8uY2nM5pL1tV7cX3kH9dS6fB2gA4wE";
+const authSecret = getAuthSecret();
+
+if (!authSecret) {
+    throw new Error("Authentication secret is not configured.");
+}
+
 const siteIdentity = getSiteIdentity();
 
 function buildAuthEmail(params: {

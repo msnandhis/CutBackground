@@ -27,7 +27,9 @@ export async function GET(
         return new NextResponse(output.body, {
             headers: {
                 "Content-Type": output.contentType,
-                "Cache-Control": "private, max-age=60",
+                "Cache-Control": "private, no-store",
+                "Content-Disposition": 'attachment; filename="background-removed.png"',
+                "X-Content-Type-Options": "nosniff",
             },
         });
     } catch (error) {

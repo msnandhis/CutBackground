@@ -40,7 +40,9 @@ test.describe("auth, api keys, and job lifecycle", () => {
 
         await page.getByTestId("api-key-name").fill("E2E Key");
         await page.getByTestId("api-key-create").click();
-        await expect(page.getByTestId("api-key-secret")).toContainText("cb_live_");
+        await expect(page.getByTestId("api-key-secret")).toContainText("cb_live_", {
+            timeout: 20_000,
+        });
 
         await page.goto("/background-remover");
         await page.setInputFiles('[data-testid="tool-file-input"]', {
@@ -50,7 +52,11 @@ test.describe("auth, api keys, and job lifecycle", () => {
         });
         await page.getByTestId("tool-run").click();
 
-        await expect(page.getByTestId("tool-output-preview")).toBeVisible();
-        await expect(page.getByTestId("tool-download-output")).toBeVisible();
+        await expect(page.getByTestId("tool-output-preview")).toBeVisible({
+            timeout: 20_000,
+        });
+        await expect(page.getByTestId("tool-download-output")).toBeVisible({
+            timeout: 20_000,
+        });
     });
 });

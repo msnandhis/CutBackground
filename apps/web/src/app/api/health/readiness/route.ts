@@ -13,7 +13,10 @@ export async function GET() {
     );
     const ready = blockingDependencies.every((dependency) => dependency.configured);
 
-    return NextResponse.json(summary, {
+    return NextResponse.json({
+        ready,
+        checkedAt: new Date().toISOString(),
+    }, {
         status: ready ? 200 : 503,
     });
 }

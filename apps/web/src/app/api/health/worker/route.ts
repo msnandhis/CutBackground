@@ -15,8 +15,7 @@ export async function GET() {
     return NextResponse.json(
         {
             healthy,
-            queue,
-            staleJobs,
+            checkedAt: new Date().toISOString(),
         },
         { status: healthy ? 200 : 503 }
     );

@@ -14,6 +14,7 @@
         "./logger": "./src/logger/index.ts",
         "./mail": "./src/mail/index.ts",
         "./redis": "./src/redis/index.ts",
+        "./security/safe-webhook-url": "./src/security/safe-webhook-url.ts",
         "./jobs": "./src/jobs/index.ts",
         "./jobs/tool-worker": "./src/jobs/tool-worker.ts",
         "./billing": "./src/billing/index.ts",

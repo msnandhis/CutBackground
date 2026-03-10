@@ -24,6 +24,7 @@ export function ToolStudio() {
     const [progressValue, setProgressValue] = useState(0);
     const [isPending, startTransition] = useTransition();
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const idempotencyKeyRef = useRef<string | null>(null);
     const { data: sessionData, isPending: isSessionPending } = authClient.useSession();
 
     useEffect(() => {
@@ -102,11 +103,13 @@ export function ToolStudio() {
         setJob(null);
         setErrorMessage(null);
         setProgressValue(0);
+        idempotencyKeyRef.current = null;
     }
 
     function selectFile(file: File | null) {
-        setSelectedFile(file);
         resetStudio();
+        setSelectedFile(file);
+        idempotencyKeyRef.current = file ? globalThis.crypto.randomUUID() : null;
     }
 
     async function handleSubmit() {
@@ -125,6 +128,11 @@ export function ToolStudio() {
 
         const response = await fetch("/api/background-remover/jobs", {
             method: "POST",
+            headers: idempotencyKeyRef.current
+                ? {
+                      "Idempotency-Key": idempotencyKeyRef.current,
+                  }
+                : undefined,
             body: formData,
         });
 
@@ -299,7 +307,10 @@ export function ToolStudio() {
                             </div>
                             <div className="rounded-[1.5rem] bg-[repeating-conic-gradient(#e5e5e5_0%_25%,#fff_0%_50%)] bg-[length:18px_18px] p-5">
                                 <p className="text-sm font-semibold text-neutral-500">Background removed</p>
-                                <div className="mt-4 flex aspect-[4/5] flex-col justify-between rounded-[1.25rem] border border-white/70 bg-white/40 p-5 backdrop-blur-sm">
+                                <div
+                                    data-testid="tool-output-preview"
+                                    className="mt-4 flex aspect-[4/5] flex-col justify-between rounded-[1.25rem] border border-white/70 bg-white/40 p-5 backdrop-blur-sm"
+                                >
                                     {job?.outputUrl ? (
                                         <Image
                                             src={job.outputUrl}
@@ -307,7 +318,6 @@ export function ToolStudio() {
                                             width={800}
                                             height={1000}
                                             unoptimized
-                                            data-testid="tool-output-preview"
                                             className="h-full w-full rounded-[1rem] object-cover"
                                         />
                                     ) : (

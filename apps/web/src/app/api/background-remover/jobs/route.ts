@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         const response = await createToolJob({
             file,
             ip: request.headers.get("x-forwarded-for") ?? undefined,
+            idempotencyKey: request.headers.get("idempotency-key"),
         });
 
         return NextResponse.json(response, { status: 201 });
