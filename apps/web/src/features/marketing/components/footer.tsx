@@ -4,13 +4,12 @@ import { siteConfig } from "@config/site";
 
 export function Footer() {
     return (
-        <footer className="bg-black px-4 py-16">
-            <div className="mx-auto max-w-7xl">
+        <footer className="bg-black py-16">
+            <div className="marketing-container">
                 <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-5">
-                    {/* Brand column */}
                     <div className="lg:col-span-2">
                         <Link href="/" className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-magenta">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-magenta">
                                 <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                                 </svg>
@@ -22,7 +21,6 @@ export function Footer() {
                         <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
                             AI-powered background removal for creators, designers, and e-commerce sellers. Fast, free, and professional quality.
                         </p>
-                        {/* Social icons */}
                         <div className="mt-6 flex gap-3">
                             {[
                                 { label: "X", href: "#" },
@@ -62,7 +60,6 @@ export function Footer() {
                     ))}
                 </div>
 
-                {/* Bottom bar */}
                 <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
                     <p className="text-xs text-white/40">
                         &copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.

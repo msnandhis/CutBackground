@@ -6,14 +6,20 @@
 
 :root {
   --brand-magenta: #ff0076;
-  --brand-dark: #12131a;
-  --brand-light: #f0faff;
+  --brand-magenta-hover: #e0006a;
+  --brand-dark: #13111a;
+  --brand-light: #f8fcff;
+  --brand-aqua: #7fffd4;
   --brand-success: #10b981;
+  --surface-border: #e5e7eb;
+  --surface-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --surface-shadow-hover: 0 10px 24px rgba(0, 0, 0, 0.09);
+  --container-width: 1280px;
 }
 
 body {
   font-family: "Inter", sans-serif;
-  color: #333333;
+  color: #000000;
   background-color: #ffffff;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -26,6 +32,7 @@ h4,
 h5,
 h6 {
   font-family: "Quicksand", sans-serif;
+  letter-spacing: -0.025em;
 }
 
 /* Smooth focus styles for accessibility */
@@ -51,4 +58,94 @@ h6 {
 
 .animate-scroll:hover {
   animation-play-state: paused;
+}
+
+.marketing-container {
+  width: 100%;
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.marketing-section {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+.marketing-card {
+  border: 1px solid var(--surface-border);
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow: var(--surface-shadow);
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.marketing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--surface-shadow-hover);
+}
+
+.marketing-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--brand-magenta);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.marketing-button-primary:hover {
+  background: var(--brand-magenta-hover);
+  transform: translateY(-1px);
+}
+
+.marketing-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid var(--surface-border);
+  background: #ffffff;
+  color: #000000;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.marketing-button-secondary:hover {
+  background: #f6f6f7;
+  transform: translateY(-1px);
+}
+
+@media (min-width: 640px) {
+  .marketing-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .marketing-section {
+    padding-top: 6rem;
+    padding-bottom: 6rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .marketing-container {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
 }

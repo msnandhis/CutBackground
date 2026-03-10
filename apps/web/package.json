@@ -3,9 +3,9 @@
     "version": "0.0.0",
     "private": true,
     "scripts": {
-        "dev": "node --experimental-strip-types ../../packages/core/scripts/startup-check.mjs web && next dev --turbopack",
-        "build": "next build --webpack",
-        "start": "node --experimental-strip-types ../../packages/core/scripts/startup-check.mjs web && next start",
+        "dev": "node --experimental-strip-types ../../packages/core/scripts/startup-check.mjs web && node ../../packages/core/scripts/run-with-env.mjs pnpm exec next dev --turbopack",
+        "build": "node ../../packages/core/scripts/run-with-env.mjs pnpm exec next build --webpack",
+        "start": "node --experimental-strip-types ../../packages/core/scripts/startup-check.mjs web && node ../../packages/core/scripts/run-with-env.mjs pnpm exec next start",
         "lint": "eslint .",
         "clean": "rm -rf .next node_modules"
     },

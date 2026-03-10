@@ -9,36 +9,45 @@ const localDevelopmentAuthSecret =
     "8n4E3pQ1x7Lm2Vz9Kc5Tw0Ba6Yh8Rs4Df1Ju7Np3Xe9Gm2Qk6Hv0La5Zs8Wd1Cr";
 const localDevelopmentAppUrl = "http://localhost:3000";
 
+const optionalString = z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().min(1).optional()
+);
+const optionalUrl = z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().url().optional()
+);
+
 const envSchema = z.object({
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
-    DATABASE_URL: z.string().min(1).optional(),
-    BETTER_AUTH_SECRET: z.string().min(1).optional(),
-    BETTER_AUTH_URL: z.string().url().optional(),
-    NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
-    REDIS_URL: z.string().url().optional(),
+    DATABASE_URL: optionalString,
+    BETTER_AUTH_SECRET: optionalString,
+    BETTER_AUTH_URL: optionalUrl,
+    NEXT_PUBLIC_BETTER_AUTH_URL: optionalUrl,
+    REDIS_URL: optionalUrl,
     ENABLE_BACKGROUND_QUEUE: z.string().optional(),
-    R2_ENDPOINT: z.string().url().optional(),
-    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-    R2_BUCKET_NAME: z.string().min(1).optional(),
-    REPLICATE_API_TOKEN: z.string().min(1).optional(),
-    REPLICATE_BACKGROUND_REMOVER_MODEL: z.string().min(1).optional(),
-    REPLICATE_WEBHOOK_SECRET: z.string().min(1).optional(),
+    R2_ENDPOINT: optionalUrl,
+    R2_ACCESS_KEY_ID: optionalString,
+    R2_SECRET_ACCESS_KEY: optionalString,
+    R2_BUCKET_NAME: optionalString,
+    REPLICATE_API_TOKEN: optionalString,
+    REPLICATE_BACKGROUND_REMOVER_MODEL: optionalString,
+    REPLICATE_WEBHOOK_SECRET: optionalString,
     REPLICATE_WEBHOOK_TOLERANCE_SECONDS: z.coerce.number().int().positive().optional(),
     TOOL_EXECUTION_MODE: z.enum(["replicate", "mock"]).optional(),
     TOOL_MOCK_DELAY_MS: z.coerce.number().int().min(0).optional(),
     EMAIL_PROVIDER: z.enum(["auto", "resend", "brevo"]).optional(),
-    RESEND_API_KEY: z.string().min(1).optional(),
-    BREVO_API_KEY: z.string().min(1).optional(),
-    EMAIL_FROM: z.string().email().optional(),
-    EMAIL_REPLY_TO: z.string().email().optional(),
+    RESEND_API_KEY: optionalString,
+    BREVO_API_KEY: optionalString,
+    EMAIL_FROM: optionalString,
+    EMAIL_REPLY_TO: optionalString,
     ADMIN_EMAILS: z.string().optional(),
-    TOOL_STORAGE_DIR: z.string().min(1).optional(),
+    TOOL_STORAGE_DIR: optionalString,
     TOOL_PROVIDER_ATTEMPTS: z.coerce.number().int().positive().optional(),
     TOOL_PROVIDER_RETRY_DELAY_MS: z.coerce.number().int().positive().optional(),
     TOOL_STALE_JOB_THRESHOLD_SECONDS: z.coerce.number().int().positive().optional(),
-    NEXT_PUBLIC_SITE_DOMAIN: z.string().min(1).optional(),
-    NEXT_PUBLIC_TOOL_NAME: z.string().min(1).optional(),
+    NEXT_PUBLIC_SITE_DOMAIN: optionalString,
+    NEXT_PUBLIC_TOOL_NAME: optionalString,
 });
 
 const env = envSchema.parse(process.env);

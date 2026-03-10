@@ -1,14 +1,17 @@
-const placeholderDatabaseUrl =
-    "postgresql://placeholder:placeholder@127.0.0.1:9/placeholder";
-
 export function getDatabaseUrl() {
-    if (process.env.DATABASE_URL) {
-        return process.env.DATABASE_URL;
-    }
-
-    return placeholderDatabaseUrl;
+    return process.env.DATABASE_URL ?? null;
 }
 
 export function isUsingLocalDevelopmentDatabaseFallback() {
     return !process.env.DATABASE_URL;
+}
+
+export function getDatabaseUrlOrThrow() {
+    const databaseUrl = getDatabaseUrl();
+
+    if (!databaseUrl) {
+        throw new Error("DATABASE_URL is not configured for the current process.");
+    }
+
+    return databaseUrl;
 }
