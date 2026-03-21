@@ -17,7 +17,7 @@ export function startToolWorker() {
     );
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+async function main() {
     await recoverStaleJobsIfNeeded();
     const worker = startToolWorker();
     const recoveryInterval = setInterval(async () => {
@@ -48,4 +48,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+    main().catch((err) => {
+        logger.error({ err }, "Tool worker failed to start.");
+        process.exit(1);
+    });
 }
