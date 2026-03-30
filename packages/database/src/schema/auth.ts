@@ -1,74 +1,102 @@
 import {
-    boolean,
-    integer,
-    pgTable,
-    text,
-    timestamp,
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("user", {
-    id: text("id").primaryKey(),
-    name: text("name"),
-    email: text("email").notNull().unique(),
-    emailVerified: boolean("email_verified").notNull().default(false),
-    image: text("image"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 export const user = users;
 
-export const sessions = pgTable("session", {
+export const sessions = pgTable(
+  "session",
+  {
     id: text("id").primaryKey(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     userId: text("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
-});
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_user_id_idx").on(table.userId)],
+);
 export const session = sessions;
 
-export const accounts = pgTable("account", {
+export const accounts = pgTable(
+  "account",
+  {
     id: text("id").primaryKey(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
     accessTokenExpiresAt: timestamp("access_token_expires_at", {
-        withTimezone: true,
+      withTimezone: true,
     }),
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
-        withTimezone: true,
+      withTimezone: true,
     }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("account_user_id_idx").on(table.userId)],
+);
 export const account = accounts;
 
-export const verifications = pgTable("verification", {
+export const verifications = pgTable(
+  "verification",
+  {
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+  },
+  (table) => [
+    index("verification_identifier_idx").on(table.identifier),
+    index("verification_expires_at_idx").on(table.expiresAt),
+  ],
+);
 export const verification = verifications;
 
 export const rateLimits = pgTable("rate_limit", {
-    key: text("key").primaryKey(),
-    count: integer("count").notNull().default(0),
-    lastRequestAt: timestamp("last_request_at", { withTimezone: true })
-        .notNull()
-        .defaultNow(),
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  lastRequestAt: timestamp("last_request_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 export const rateLimit = rateLimits;

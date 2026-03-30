@@ -97,6 +97,18 @@ function isMockToolExecution() {
 
 async function checkPostgres() {
   const databaseUrl = requireEnv("DATABASE_URL");
+
+  if (isProductionEnvironment()) {
+    const hasSsl =
+      databaseUrl.includes("sslmode=") || databaseUrl.includes("ssl=");
+    if (!hasSsl) {
+      console.warn(
+        "startup-check: WARNING - PostgreSQL connection in production without SSL. " +
+          "Consider adding ?sslmode=require to DATABASE_URL.",
+      );
+    }
+  }
+
   const client = new PgClient({
     connectionString: databaseUrl,
     connectionTimeoutMillis: 5000,
@@ -134,7 +146,9 @@ async function main() {
   const target = process.argv[2];
 
   if (!target || (target !== "web" && target !== "worker")) {
-    fail("usage: node --experimental-strip-types startup-check.mjs <web|worker>");
+    fail(
+      "usage: node --experimental-strip-types startup-check.mjs <web|worker>",
+    );
   }
 
   await checkPostgres();
@@ -169,5 +183,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  fail(error instanceof Error ? error.message : "unknown startup validation error");
+  fail(
+    error instanceof Error ? error.message : "unknown startup validation error",
+  );
 });

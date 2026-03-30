@@ -3,32 +3,59 @@ import { getSiteIdentity } from "../env";
 
 const siteIdentity = getSiteIdentity();
 
+const sensitiveFields = [
+  "password",
+  "passwordHash",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "idToken",
+  "secret",
+  "apiKey",
+  "api_key",
+  "apiKeyId",
+  "api_key_id",
+  "apiSecret",
+  "api_secret",
+  "secretKey",
+  "secret_key",
+  "privateKey",
+  "private_key",
+  "credential",
+  "authorization",
+  "cookie",
+  "session",
+  "webhookSecret",
+  "webhook_secret",
+  "hashedKey",
+  "hashed_key",
+];
+
 export const logger = pino({
-    level: process.env.NODE_ENV === "production" ? "info" : "debug",
-    formatters: {
-        level(label) {
-            return { level: label };
-        },
+  level: process.env.NODE_ENV === "production" ? "info" : "debug",
+  formatters: {
+    level(label) {
+      return { level: label };
     },
-    timestamp: pino.stdTimeFunctions.isoTime,
-    base: {
-        domain: siteIdentity.domain,
-        tool: siteIdentity.toolName,
-    },
+  },
+  timestamp: pino.stdTimeFunctions.isoTime,
+  base: {
+    domain: siteIdentity.domain,
+    tool: siteIdentity.toolName,
+  },
+  redact: {
+    paths: sensitiveFields.flatMap((field) => [`*.${field}`, `${field}`]),
+    censor: "[REDACTED]",
+  },
 });
 
-/**
- * Creates a child logger with request-specific metadata.
- * Use this in API routes and middleware to automatically
- * attach requestId, endpoint, and IP to every log line.
- */
 export function createRequestLogger(meta: {
-    requestId: string;
-    endpoint: string;
-    ip?: string;
-    fingerprint?: string;
+  requestId: string;
+  endpoint: string;
+  ip?: string;
+  fingerprint?: string;
 }) {
-    return logger.child(meta);
+  return logger.child(meta);
 }
 
 export type { Logger } from "pino";
