@@ -1,52 +1,53 @@
 {
-    "name": "@repo/core",
-    "version": "0.0.0",
-    "private": true,
-    "main": "./src/index.ts",
-    "types": "./src/index.ts",
-    "exports": {
-        ".": "./src/index.ts",
-        "./auth": "./src/auth/auth.ts",
-        "./auth/client": "./src/auth/auth-client.ts",
-        "./auth/server": "./src/auth/auth.ts",
-        "./ai-provider/replicate": "./src/ai-provider/replicate.ts",
-        "./env": "./src/env/index.ts",
-        "./logger": "./src/logger/index.ts",
-        "./mail": "./src/mail/index.ts",
-        "./redis": "./src/redis/index.ts",
-        "./security/safe-webhook-url": "./src/security/safe-webhook-url.ts",
-        "./jobs": "./src/jobs/index.ts",
-        "./jobs/tool-worker": "./src/jobs/tool-worker.ts",
-        "./billing": "./src/billing/index.ts",
-        "./r2": "./src/r2/index.ts",
-        "./storage": "./src/storage/index.ts"
-    },
-    "scripts": {
-        "build": "tsc -p tsconfig.json",
-        "readiness:check": "node --experimental-strip-types scripts/readiness-check.mjs",
-        "startup:check:web": "node --experimental-strip-types scripts/startup-check.mjs web",
-        "startup:check:worker": "node --experimental-strip-types scripts/startup-check.mjs worker",
-        "worker:tool": "pnpm startup:check:worker && node scripts/run-with-env.mjs pnpm exec tsx src/jobs/tool-worker.ts",
-        "clean": "rm -rf dist node_modules"
-    },
-    "dependencies": {
-        "@better-auth/drizzle-adapter": "^1.5.4",
-        "pino": "^9.0.0",
-        "bullmq": "^5.0.0",
-        "ioredis": "^5.4.0",
-        "@aws-sdk/client-s3": "^3.600.0",
-        "@aws-sdk/s3-request-presigner": "^3.600.0",
-        "better-auth": "^1.5.4",
-        "drizzle-orm": "^0.45.1",
-        "pg": "^8.20.0",
-        "replicate": "^1.1.0",
-        "@repo/database": "workspace:*",
-        "zod": "^3.23.0"
-    },
-    "devDependencies": {
-        "@repo/tsconfig": "workspace:*",
-        "@types/node": "^22.15.0",
-        "tsx": "^4.20.6",
-        "typescript": "^5.5.0"
-    }
+  "name": "@repo/core",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./auth": "./src/auth/auth.ts",
+    "./auth/client": "./src/auth/auth-client.ts",
+    "./auth/server": "./src/auth/auth.ts",
+    "./ai-provider/replicate": "./src/ai-provider/replicate.ts",
+    "./env": "./src/env/index.ts",
+    "./logger": "./src/logger/index.ts",
+    "./mail": "./src/mail/index.ts",
+    "./redis": "./src/redis/index.ts",
+    "./security/safe-webhook-url": "./src/security/safe-webhook-url.ts",
+    "./jobs": "./src/jobs/index.ts",
+    "./jobs/tool-worker": "./src/jobs/tool-worker.ts",
+    "./billing": "./src/billing/index.ts",
+    "./credits": "./src/credits/index.ts",
+    "./r2": "./src/r2/index.ts",
+    "./storage": "./src/storage/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "readiness:check": "node --experimental-strip-types scripts/readiness-check.mjs",
+    "startup:check:web": "node --experimental-strip-types scripts/startup-check.mjs web",
+    "startup:check:worker": "node --experimental-strip-types scripts/startup-check.mjs worker",
+    "worker:tool": "pnpm startup:check:worker && node scripts/run-with-env.mjs pnpm exec tsx src/jobs/tool-worker.ts",
+    "clean": "rm -rf dist node_modules"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.5.4",
+    "pino": "^9.0.0",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0",
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/s3-request-presigner": "^3.600.0",
+    "better-auth": "^1.5.4",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.20.0",
+    "replicate": "^1.1.0",
+    "@repo/database": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.5.0"
+  }
 }

@@ -59,6 +59,9 @@ const envSchema = z.object({
     .optional(),
   NEXT_PUBLIC_SITE_DOMAIN: optionalString,
   NEXT_PUBLIC_TOOL_NAME: optionalString,
+  DODO_PAYMENTS_API_KEY: optionalString,
+  DODO_PAYMENTS_WEBHOOK_SECRET: optionalString,
+  DODO_PAYMENTS_ENVIRONMENT: z.enum(["live", "test"]).optional(),
 });
 
 const env = envSchema.parse(process.env);
@@ -70,7 +73,8 @@ export type RuntimeDependency =
   | "background-queue"
   | "r2"
   | "replicate"
-  | "email";
+  | "email"
+  | "billing";
 
 export interface RuntimeDependencyStatus {
   name: RuntimeDependency;
@@ -442,6 +446,53 @@ export function getRuntimeDependencyStatuses(): RuntimeDependencyStatus[] {
     getReplicateDependencyStatus(),
     getEmailDependencyStatus(),
   ];
+}
+
+export type PaymentProvider = "dodo";
+
+export function getDodoPaymentsConfig() {
+  if (env.TOOL_EXECUTION_MODE === "mock") {
+    return {
+      apiKey: env.DODO_PAYMENTS_API_KEY ?? "mock",
+      webhookSecret: env.DODO_PAYMENTS_WEBHOOK_SECRET ?? "mock",
+      environment: "test" as const,
+    };
+  }
+
+  if (!env.DODO_PAYMENTS_API_KEY) {
+    return null;
+  }
+
+  return {
+    apiKey: env.DODO_PAYMENTS_API_KEY,
+    webhookSecret: env.DODO_PAYMENTS_WEBHOOK_SECRET ?? null,
+    environment: env.DODO_PAYMENTS_ENVIRONMENT ?? "live",
+  };
+}
+
+export function isBillingConfigured() {
+  return Boolean(getDodoPaymentsConfig());
+}
+
+export function getBillingDependencyStatus(): RuntimeDependencyStatus {
+  const requiredEnv = ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_SECRET"];
+  const missingEnv: string[] = [];
+
+  if (!env.DODO_PAYMENTS_API_KEY) {
+    missingEnv.push("DODO_PAYMENTS_API_KEY");
+  }
+
+  if (!env.DODO_PAYMENTS_WEBHOOK_SECRET) {
+    missingEnv.push("DODO_PAYMENTS_WEBHOOK_SECRET");
+  }
+
+  return {
+    name: "billing",
+    configured: missingEnv.length === 0,
+    requiredEnv,
+    missingEnv,
+    note: "Required for paid plan purchases and credit tracking.",
+  };
 }
 
 export function assertRuntimeRequirements(target: RuntimeDependency) {

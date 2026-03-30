@@ -20,13 +20,20 @@ import { createRequestLogger } from "@repo/core/logger";
 import { getPresignedDownloadUrl } from "@repo/core/r2";
 import { isLocalToolAsset, storeToolAsset } from "@repo/core/storage";
 import { rateLimitUser } from "@repo/core/redis";
-import { logToolUsage } from "@repo/core";
+import {
+  logToolUsage,
+  hasCredits,
+  deductCredits,
+  refundCredits,
+} from "@repo/core";
+import { isBillingConfigured } from "@repo/core/env";
 import { toolConfig } from "@config/tool";
 import { apiRouteError } from "@/lib/server/api";
 import type { JobStatus } from "@/lib/types";
 import type { ToolCreateJobResponse, ToolJobDto } from "../types";
 import { validateImageUpload } from "./upload-validation";
 
+const creditCost = 1;
 const queueEnabled = isBackgroundQueueConfigured();
 
 function formatDate(value: Date) {
@@ -379,6 +386,21 @@ export async function createToolJobForUser(input: {
     });
   }
 
+  if (isBillingConfigured()) {
+    const userHasCredits = await hasCredits(input.userId, creditCost);
+
+    if (!userHasCredits) {
+      throw apiRouteError({
+        status: 402,
+        code: "INSUFFICIENT_CREDITS",
+        message: "You do not have enough credits to run this operation.",
+        details: {
+          required: creditCost,
+        },
+      });
+    }
+  }
+
   const file = input.file;
   const maxFileSizeBytes = toolConfig.input.maxFileSizeMB * 1024 * 1024;
 
@@ -482,6 +504,28 @@ export async function createToolJobForUser(input: {
 
   try {
     await db.insert(jobs).values(baseRecord);
+
+    if (isBillingConfigured()) {
+      const deduction = await deductCredits(
+        input.userId,
+        creditCost,
+        jobId,
+        `Background removal: ${sanitizedFilename}`,
+      );
+
+      if (!deduction.success) {
+        await db.delete(jobs).where(eq(jobs.id, jobId));
+
+        throw apiRouteError({
+          status: 402,
+          code: "INSUFFICIENT_CREDITS",
+          message: "Failed to deduct credits for this operation.",
+          details: {
+            required: creditCost,
+          },
+        });
+      }
+    }
   } catch (error) {
     if (isUniqueConstraintViolation(error)) {
       const raceRecoveredJob = await getExistingIdempotentJob({
@@ -533,6 +577,15 @@ export async function createToolJobForUser(input: {
         completedAt: new Date(),
       })
       .where(eq(jobs.id, jobId));
+
+    if (isBillingConfigured()) {
+      await refundCredits(
+        input.userId,
+        creditCost,
+        jobId,
+        "Job creation failed - credit refund",
+      );
+    }
   }
 
   const createdJob = await getToolJob(jobId, input.userId);
@@ -650,6 +703,47 @@ export async function cancelToolJob(jobId: string, userId: string) {
         }),
       })
       .where(eq(jobs.id, jobId));
+
+    if (isBillingConfigured()) {
+      await refundCredits(
+        userId,
+        creditCost,
+        jobId,
+        "Job canceled - credit refund",
+      );
+    }
+
+    return getToolJob(jobId, userId);
+  }
+
+  if (
+    row.status === "processing" &&
+    row.provider === "replicate" &&
+    row.providerJobId
+  ) {
+    await cancelBackgroundRemoval(row.providerJobId);
+
+    await db
+      .update(jobs)
+      .set({
+        status: "canceled",
+        completedAt: new Date(),
+        errorMessage: "Canceled by user during provider execution.",
+        metadata: JSON.stringify({
+          ...metadata,
+          canceledAt: new Date().toISOString(),
+        }),
+      })
+      .where(eq(jobs.id, jobId));
+
+    if (isBillingConfigured()) {
+      await refundCredits(
+        userId,
+        creditCost,
+        jobId,
+        "Job canceled - credit refund",
+      );
+    }
 
     return getToolJob(jobId, userId);
   }

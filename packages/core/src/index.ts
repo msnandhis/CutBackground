@@ -11,6 +11,16 @@ export { isLocalToolAsset, readToolAsset, storeToolAsset } from "./storage";
 export { sendTransactionalEmail } from "./mail";
 export { logToolUsage, type ToolUsageAction } from "./usage-logging";
 export {
+  getUserCredits,
+  hasCredits,
+  deductCredits,
+  addCredits,
+  refundCredits,
+  ensureUserCreditsRecord,
+  type CreditBalance,
+  type CreditTransactionType,
+} from "./credits";
+export {
   assertRuntimeRequirements,
   getProductionReadinessSummary,
   getRuntimeDependencyStatuses,
@@ -21,4 +31,7 @@ export {
   isR2Configured,
   isRedisConfigured,
   isReplicateConfigured,
+  isBillingConfigured,
+  getDodoPaymentsConfig,
+  getBillingDependencyStatus,
 } from "./env";
